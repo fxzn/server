@@ -12,7 +12,7 @@ class KomerceService {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      timeout: 8000 
+      timeout: 20000 
     });
   }
 
