@@ -3,15 +3,6 @@ import { ResponseError } from '../error/response-error.js';
 import komerceService from './komerce-service.js';
 import snap from './midtrans-service.js';
 
-// Helper function untuk atomic stock check and update
-const updateProductStock = async (prisma, productId, quantity) => {
-  return await prisma.product.update({
-    where: { id: productId },
-    data: { stock: { decrement: quantity } },
-    select: { id: true, name: true, stock: true }
-  });
-};
-
 const calculateCartTotals = (items) => {
   return items.reduce((acc, item) => {
     const itemTotal = item.product.price * item.quantity;
@@ -51,6 +42,7 @@ const validateStockAvailability = (items) => {
 
 const createMidtransTransaction = async (order, user) => {
   try {
+    // Use database order ID as Midtrans order ID for easier tracking
     const midtransOrderId = order.id;
 
     const itemDetails = order.items.map(item => ({
@@ -73,7 +65,7 @@ const createMidtransTransaction = async (order, user) => {
 
     const parameter = {
       transaction_details: {
-        order_id: midtransOrderId,
+        order_id: midtransOrderId, // Use database order ID
         gross_amount: order.totalAmount
       },
       item_details: itemDetails,
@@ -99,7 +91,7 @@ const createMidtransTransaction = async (order, user) => {
         duration: 24
       },
       metadata: {
-        internal_order_id: order.id
+        internal_order_id: order.id // Additional reference
       }
     };
 
@@ -110,6 +102,7 @@ const createMidtransTransaction = async (order, user) => {
       token: transaction.token,
       midtransOrderId
     };
+
   } catch (error) {
     console.error('Midtrans error:', {
       message: error.message,
@@ -121,54 +114,48 @@ const createMidtransTransaction = async (order, user) => {
 };
 
 const processCheckout = async (userId, checkoutData) => {
-  // Optimasi: Pisahkan operasi yang tidak perlu dalam transaksi
-  const cart = await prismaClient.cart.findUnique({
-    where: { userId },
-    include: { items: { include: { product: true } } }
-  });
-
-  if (!cart?.items?.length) throw new ResponseError(400, 'Cart is empty');
-
-  const user = await prismaClient.user.findUnique({
-    where: { id: userId },
-    select: { fullName: true, email: true, phone: true }
-  });
-
-  const { subTotal, totalWeight, itemsWithPrice } = calculateCartTotals(cart.items);
-  validateStockAvailability(cart.items);
-
-  const shippingOptions = await komerceService.calculateShippingCost({
-    shipper_destination_id: process.env.WAREHOUSE_LOCATION_ID,
-    receiver_destination_id: checkoutData.destinationId,
-    weight: totalWeight,
-    item_value: subTotal
-  });
-
-  const selectedService = shippingOptions.find(service => 
-    service.shipping_name.toLowerCase() === checkoutData.courier.toLowerCase() && 
-    service.service_name.toLowerCase() === checkoutData.shippingService.toLowerCase()
-  );
-
-  if (!selectedService) {
-    throw new ResponseError(400, 'Selected shipping service not available');
-  }
-
-  // Mulai transaksi dengan timeout lebih panjang
   return await prismaClient.$transaction(async (prisma) => {
-    // 1. Update stok produk dengan verifikasi
-    const updatedProducts = await Promise.all(
+    const cart = await prisma.cart.findUnique({
+      where: { userId },
+      include: { items: { include: { product: true } } }
+    });
+
+    if (!cart?.items?.length) throw new ResponseError(400, 'Cart is empty');
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, email: true, phone: true }
+    });
+
+    const { subTotal, totalWeight, itemsWithPrice } = calculateCartTotals(cart.items);
+    validateStockAvailability(cart.items);
+
+    const shippingOptions = await komerceService.calculateShippingCost({
+      shipper_destination_id: process.env.WAREHOUSE_LOCATION_ID,
+      receiver_destination_id: checkoutData.destinationId,
+      weight: totalWeight,
+      item_value: subTotal
+    });
+
+    const selectedService = shippingOptions.find(service => 
+      service.shipping_name.toLowerCase() === checkoutData.courier.toLowerCase() && 
+      service.service_name.toLowerCase() === checkoutData.shippingService.toLowerCase()
+    );
+
+    if (!selectedService) {
+      throw new ResponseError(400, 'Selected shipping service not available');
+    }
+
+    // Update product stocks
+    await Promise.all(
       cart.items.map(item => 
-        updateProductStock(prisma, item.productId, item.quantity)
-          .then(updatedProduct => {
-            if (updatedProduct.stock < 0) {
-              throw new ResponseError(400, `Insufficient stock for product: ${updatedProduct.name}`);
-            }
-            return updatedProduct;
-          })
+        prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        })
       )
     );
 
-    // 2. Buat order
     const order = await prisma.order.create({
       data: {
         userId,
@@ -197,15 +184,12 @@ const processCheckout = async (userId, checkoutData) => {
         estimatedDelivery: selectedService.etd || '1-3 days'
       },
       include: { items: { include: { product: true } } }
-  });
+    });
 
-    // 3. Kosongkan keranjang
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    // 4. Buat transaksi Midtrans
     const paymentData = await createMidtransTransaction(order, user);
 
-    // 5. Update order dengan data pembayaran
     return await prisma.order.update({
       where: { id: order.id },
       data: {
@@ -213,16 +197,117 @@ const processCheckout = async (userId, checkoutData) => {
         paymentUrl: paymentData.paymentUrl,
         midtransOrderId: paymentData.midtransOrderId
       },
-      include: { items: { include: { product: true } } }
-    });
+      include: { items: { include: { product: true } } }}
+    )
   }, {
     maxWait: 20000, // 20 detik maksimal menunggu
     timeout: 15000  // 15 detik timeout
   });
 };
 
-// handlePaymentNotification tetap sama seperti sebelumnya
+
+
+
+// Add this new function to handle payment notifications
+const handlePaymentNotification = async (notification) => {
+  try {
+    // First validate the notification structure
+    if (!notification || !notification.transaction_status) {
+      throw new ResponseError(400, 'Invalid notification payload');
+    }
+
+    // Initialize Midtrans client with proper credentials
+    const snap = new midtransClient.Snap({
+      isProduction: false, // Set to true for production
+      serverKey: process.env.MIDTRANS_SERVER_KEY,
+      clientKey: process.env.MIDTRANS_CLIENT_KEY
+    });
+
+    // Verify the notification
+    const statusResponse = await snap.transaction.notification(notification);
+    
+    // Extract order ID - use the correct field based on your implementation
+    const orderId = statusResponse.order_id;
+
+    if (!orderId) {
+      throw new ResponseError(400, 'Missing order_id in notification');
+    }
+
+    // Find the order in database
+    const order = await prismaClient.order.findUnique({
+      where: { id: orderId }
+    });
+
+    if (!order) {
+      throw new ResponseError(404, `Order not found: ${orderId}`);
+    }
+
+    // Determine new status based on notification
+    let newStatus = order.status;
+    let paymentStatus = order.paymentStatus;
+
+    switch (statusResponse.transaction_status) {
+      case 'capture':
+        if (statusResponse.fraud_status === 'challenge') {
+          newStatus = 'PENDING';
+          paymentStatus = 'CHALLENGE';
+        } else if (statusResponse.fraud_status === 'accept') {
+          newStatus = 'PAID';
+          paymentStatus = 'PAID';
+        }
+        break;
+      case 'settlement':
+        newStatus = 'PAID';
+        paymentStatus = 'PAID';
+        break;
+      case 'cancel':
+      case 'deny':
+      case 'expire':
+        newStatus = 'CANCELLED';
+        paymentStatus = 'FAILED';
+        break;
+      case 'pending':
+        newStatus = 'PENDING';
+        paymentStatus = 'PENDING';
+        break;
+    }
+
+    // Update the order status
+    await prismaClient.order.update({
+      where: { id: orderId },
+      data: {
+        status: newStatus,
+        paymentStatus,
+        paymentMethod: statusResponse.payment_type,
+        ...(paymentStatus === 'PAID' && { paidAt: new Date() })
+      }
+    });
+
+    // Create payment log
+    await prismaClient.paymentLog.create({
+      data: {
+        orderId,
+        paymentMethod: statusResponse.payment_type,
+        amount: parseFloat(statusResponse.gross_amount),
+        status: paymentStatus,
+        transactionId: statusResponse.transaction_id,
+        payload: JSON.stringify(statusResponse)
+      }
+    });
+
+    return { status: newStatus, paymentStatus };
+    
+  } catch (error) {
+    console.error('Payment notification error:', {
+      error: error.message,
+      notification,
+      stack: error.stack
+    });
+    throw new ResponseError(500, 'Failed to process payment notification');
+  }
+};
 
 export default {
   processCheckout,
+  handlePaymentNotification
 };
