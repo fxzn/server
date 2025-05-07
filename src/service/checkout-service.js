@@ -225,5 +225,4 @@ const processCheckout = async (userId, checkoutData) => {
 
 export default {
   processCheckout,
-  handlePaymentNotification
 };
