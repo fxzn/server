@@ -1,0 +1,224 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id                      String        @id @default(uuid())
+  fullName                String?
+  email                   String        @unique
+  phone                   String?
+  password                String?       // Diubah jadi optional untuk social login
+  avatar                  String?       // Tambahkan field baru
+  token                   String?
+  role                    Role          @default(USER)
+  resetPasswordToken      String?
+  resetPasswordExpire     DateTime?
+  provider                Provider      @default(LOCAL)
+  isVerified              Boolean       @default(false)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  products                Product[]
+  carts                   Cart[]
+  orders                  Order[]
+  reviews                 Review[]
+  wishlists               Wishlist[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+
+enum Provider {
+  LOCAL    // Untuk registrasi manual
+  GOOGLE   // Untuk login Google
+}
+
+
+model Product {
+  id              String              @id @default(uuid())
+  name            String
+  price           Float
+  description     String
+  imageUrl        String
+  category        Category
+  weight          Float               // bentuk dalam kg
+  stock           Int
+  expiryDate      DateTime?           // nullable untuk non-makanan/minuman
+  createdAt       DateTime            @default(now())
+  addedBy         User?               @relation(fields: [addedById], references: [id])
+  addedById       String?             // optional jika tidak semua produk punya admin
+  ratingAvg       Float               @default(0)
+  reviewCount     Int                 @default(0)
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  Review          Review[]
+  wishlistedBy    Wishlist[]
+
+}
+
+
+enum Category {
+  Makanan    
+  Minuman
+  Aksesoris
+}
+
+
+model Cart {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  items         CartItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([userId])
+}
+
+
+model CartItem {
+  id              String        @id @default(uuid())
+  cartId          String
+  cart            Cart          @relation(fields: [cartId], references: [id])
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity        Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+
+model Order {
+  id                    String          @id @default(uuid())
+  userId                String
+  user                  User            @relation(fields: [userId], references: [id])
+  items                 OrderItem[]
+  trackingNumber        String?         // Nomor resi (opsional)
+  shippedAt             DateTime?       // Timestamp saat dikirim
+  completedAt           DateTime?       // Timestamp saat selesai
+  status                OrderStatus     @default(PENDING)
+  totalAmount           Float
+  customerName          String
+  customerEmail         String
+  customerPhone         String
+  shippingAddress       String
+  shippingCity          String
+  shippingProvince      String
+  shippingPostCode      String
+  shippingCost          Float
+  shipping_name         String  
+  service_name          String  
+  paymentMethod         String?     
+  estimatedDelivery     String?
+  paymentToken          String?           // Token transaksi Midtrans
+  paymentUrl            String?           // URL pembayaran Midtrans
+  midtransOrderId       String?           @db.VarChar(50)        // Order ID dari Midtrans
+  paymentStatus         PaymentStatus     @default(PENDING) // Status pembayaran
+  paidAt                DateTime?         // Waktu pembayaran berhasil
+  createdAt             DateTime          @default(now())
+  cancelledAt           DateTime?       // Tambahkan ini
+  reviews               Review[]
+  paymentLogs           PaymentLog[]
+
+  @@index([userId])
+  @@index([midtransOrderId])              // Index untuk pencarian berdasarkan order ID Midtrans
+}
+
+model OrderItem {
+  id              String      @id @default(uuid())
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity        Int
+  price           Float       // Harga saat checkout (snapshot)
+  productName     String      // Snapshot nama produk saat checkout
+  weight          Float       // Berat per item (dalam kg)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+enum OrderStatus {
+  PENDING
+  PACKAGED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+
+model PaymentLog {
+  id                  String            @id @default(uuid())
+  orderId             String
+  order               Order             @relation(fields: [orderId], references: [id])
+  paymentMethod       String
+  amount              Float
+  status              PaymentStatus
+  transactionId       String?           // ID transaksi dari Midtrans
+  payload             Json?             // Raw data notifikasi dari Midtrans
+  createdAt           DateTime          @default(now())
+  
+  @@index([orderId])
+  @@index([transactionId])
+
+}
+
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+  CHALLENGE  
+}
+
+
+model Review {
+  id                  String      @id @default(uuid())
+  orderId             String
+  order               Order       @relation(fields: [orderId], references: [id])
+  productId           String
+  product             Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User        @relation(fields: [userId], references: [id])
+  rating              Int       
+  comment             String?
+  purchasedPrice      Float?      // Add this line
+  createdAt           DateTime    @default(now())
+  
+  @@unique([orderId, productId, userId])
+}
+
+
+model Wishlist {
+  id                      String         @id @default(uuid())
+  userId                  String
+  user                    User           @relation(fields: [userId], references: [id])
+  productId               String
+  product                 Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt               DateTime       @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, productId])  // Satu produk hanya bisa di-wishlist sekali per user
+  @@index([userId])              // Untuk query wishlist by user
+  @@index([productId])           // Untuk analisis produk populer
+}
