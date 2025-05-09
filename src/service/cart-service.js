@@ -14,7 +14,8 @@ const getCart = async (userId) => {
               name: true,
               price: true,
               imageUrl: true,
-              stock: true
+              stock: true,
+              weight:true
             }
           }
         }
