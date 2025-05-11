@@ -3,10 +3,9 @@ import { authMiddleware } from '../middleware/auth-middleware.js';
 import { logout } from '../controller/user-controller.js';
 import upload from '../utils/avatar.js';
 import { addItemToCart, clearCart, getCart, removeItemFromCart, updateCartItem } from '../controller/cart-controller.js';
-import { searchDestinations } from '../controller/checkout-controller.js';
+import { handleMidtransNotification, searchDestinations } from '../controller/checkout-controller.js';
 import { getShippingOptions } from '../controller/checkout-controller.js';
 import { checkout } from '../controller/checkout-controller.js';
-import { handleMidtransNotification } from '../controller/midtrans-controller.js';
 import { cancelUserOrder, getOrderDetails, getOrderTracking, getUserOrders } from '../controller/order-controller.js';
 import { completeOrder, createReview, getProductReviews } from '../controller/review-controller.js';
 import { addToWishlist, checkProductInWishlist, getWishlist, removeFromWishlist } from '../controller/wishlist-controller.js';
@@ -37,7 +36,7 @@ router.delete('/api/v1/cart', clearCart);
     
 // Checkout router
 router.post('/api/v1/checkout', checkout);
-router.post('/api/v1/payments/notifications', handleMidtransNotification);
+router.post('/payments/notifications', handleMidtransNotification);
 
 
 // Raja ongkir route
