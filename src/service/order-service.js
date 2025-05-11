@@ -397,7 +397,7 @@ const cancelUserOrder = async (userId, orderId) => {
             transactionId: midtransResponse.transaction_id
           } : null
         }
-      }
+      }, 
     });
 
     // 7. Send notifications
@@ -411,6 +411,9 @@ const cancelUserOrder = async (userId, orderId) => {
         transactionId: midtransResponse.transaction_id
       } : null
     };
+  }, {
+    maxWait: 20000, // 20 detik maksimal menunggu
+    timeout: 15000  // 15 detik timeout
   });
 };
 
