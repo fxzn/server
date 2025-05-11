@@ -139,10 +139,17 @@ export const searchDestinations = async (req, res, next) => {
 
 export const handleMidtransNotification = async (req, res, next) => {
   try {
-    const notification = req.body;
-    
-    // Validasi signature jika diperlukan
-    // ...
+    // Log raw body untuk debugging
+    console.log('[Midtrans] Raw Request Body:', req.body);
+
+    // Handle content-type yang berbeda
+    let notification;
+    if (req.headers['content-type'] === 'application/json') {
+      notification = req.body;
+    } else {
+      // Handle x-www-form-urlencoded jika diperlukan
+      notification = JSON.parse(JSON.stringify(req.body));
+    }
 
     const result = await checkoutService.handlePaymentNotification(notification);
     
@@ -151,6 +158,17 @@ export const handleMidtransNotification = async (req, res, next) => {
       data: result
     });
   } catch (error) {
-    next(error);
+    console.error('[Midtrans] Notification Error:', {
+      headers: req.headers,
+      body: req.body,
+      error: error.stack
+    });
+    
+    // Return 200 ke Midtrans meskipun error (untuk menghindari retry)
+    res.status(200).json({
+      success: false,
+      message: 'Notification processed with errors',
+      error: error.message
+    });
   }
 };
