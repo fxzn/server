@@ -28,4 +28,6 @@ snap.httpClient.http_client.interceptors.response.use(
   }
 );
 
-module.exports = snap;
+// module.exports = snap;
+
+export default snap;
