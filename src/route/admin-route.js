@@ -3,7 +3,7 @@ import { adminMiddleware, authMiddleware } from '../middleware/auth-middleware.j
 import { deleteUser, getAllUsersForAdmin } from '../controller/user-controller.js';
 import { addProduct, deleteProduct, updateProduct } from '../controller/product-controller.js';
 import { uploadProductImageOptional } from '../utils/upload.js';
-import { adminDeleteOrder, adminUpdateOrder } from '../controller/order-controller.js';
+import { adminDeleteOrder, adminUpdateOrder, getAllOrdersAdmin } from '../controller/order-controller.js';
 
 
 
@@ -19,6 +19,7 @@ adminRouter.patch('/api/v1/admin/products/:id', uploadProductImageOptional, upda
 adminRouter.delete('/api/v1/admin/products/:id', deleteProduct);
 adminRouter.patch('/api/v1/admin/orders/:orderId', adminUpdateOrder);
 adminRouter.delete('/api/v1/admin/orders/:orderId', adminDeleteOrder);
+adminRouter.get('/api/v1/admin/orders', getAllOrdersAdmin);
 
 
 

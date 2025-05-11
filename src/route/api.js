@@ -37,14 +37,14 @@ router.delete('/api/v1/cart', clearCart);
     
 // Checkout router
 router.post('/api/v1/checkout', checkout);
+router.post('/api/v1/payments/notifications', handleMidtransNotification);
 
 
 // Raja ongkir route
 router.get('/api/v1/shipping/options', getShippingOptions);
 router.get('/api/v1/shipping/destinations', searchDestinations);
 
-// midtrans
-router.post('/api/v1/payment/notification', handleMidtransNotification);
+
 
 
 // Order route

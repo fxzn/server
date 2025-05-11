@@ -208,32 +208,22 @@ const processCheckout = async (userId, checkoutData) => {
 
 
 
-// Add this new function to handle payment notifications
 const handlePaymentNotification = async (notification) => {
   try {
-    // First validate the notification structure
+    // Validasi notifikasi
     if (!notification || !notification.transaction_status) {
       throw new ResponseError(400, 'Invalid notification payload');
     }
 
-    // Initialize Midtrans client with proper credentials
-    const snap = new midtransClient.Snap({
-      isProduction: false, // Set to true for production
-      serverKey: process.env.MIDTRANS_SERVER_KEY,
-      clientKey: process.env.MIDTRANS_CLIENT_KEY
-    });
-
-    // Verify the notification
+    // Verifikasi notifikasi dengan Midtrans
     const statusResponse = await snap.transaction.notification(notification);
     
-    // Extract order ID - use the correct field based on your implementation
     const orderId = statusResponse.order_id;
-
     if (!orderId) {
       throw new ResponseError(400, 'Missing order_id in notification');
     }
 
-    // Find the order in database
+    // Temukan order di database
     const order = await prismaClient.order.findUnique({
       where: { id: orderId }
     });
@@ -242,9 +232,10 @@ const handlePaymentNotification = async (notification) => {
       throw new ResponseError(404, `Order not found: ${orderId}`);
     }
 
-    // Determine new status based on notification
+    // Tentukan status baru
     let newStatus = order.status;
     let paymentStatus = order.paymentStatus;
+    let paidAt = order.paidAt;
 
     switch (statusResponse.transaction_status) {
       case 'capture':
@@ -254,11 +245,13 @@ const handlePaymentNotification = async (notification) => {
         } else if (statusResponse.fraud_status === 'accept') {
           newStatus = 'PAID';
           paymentStatus = 'PAID';
+          paidAt = new Date(statusResponse.settlement_time || new Date());
         }
         break;
       case 'settlement':
         newStatus = 'PAID';
         paymentStatus = 'PAID';
+        paidAt = new Date(statusResponse.settlement_time || new Date());
         break;
       case 'cancel':
       case 'deny':
@@ -272,18 +265,19 @@ const handlePaymentNotification = async (notification) => {
         break;
     }
 
-    // Update the order status
-    await prismaClient.order.update({
+    // Update order
+    const updatedOrder = await prismaClient.order.update({
       where: { id: orderId },
       data: {
         status: newStatus,
         paymentStatus,
         paymentMethod: statusResponse.payment_type,
-        ...(paymentStatus === 'PAID' && { paidAt: new Date() })
+        paidAt,
+        midtransResponse: JSON.stringify(statusResponse) // Simpan response lengkap
       }
     });
 
-    // Create payment log
+    // Buat payment log
     await prismaClient.paymentLog.create({
       data: {
         orderId,
@@ -291,18 +285,14 @@ const handlePaymentNotification = async (notification) => {
         amount: parseFloat(statusResponse.gross_amount),
         status: paymentStatus,
         transactionId: statusResponse.transaction_id,
-        payload: JSON.stringify(statusResponse)
+        payload: JSON.stringify(statusResponse),
+        paidAt: paymentStatus === 'PAID' ? new Date(statusResponse.settlement_time || new Date()) : null
       }
     });
 
     return { status: newStatus, paymentStatus };
-    
   } catch (error) {
-    console.error('Payment notification error:', {
-      error: error.message,
-      notification,
-      stack: error.stack
-    });
+    console.error('Payment notification error:', error);
     throw new ResponseError(500, 'Failed to process payment notification');
   }
 };

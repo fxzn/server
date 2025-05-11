@@ -33,3 +33,14 @@ export const orderIdValidation = Joi.string()
     'string.pattern.base': 'Order ID must be a valid UUID format',
     'any.required': 'Order ID is required'
   });
+
+
+
+  export const orderAdminListValidation = Joi.object({
+    page: Joi.number().min(1).default(1),
+    limit: Joi.number().min(1).max(100).default(10),
+    status: Joi.string().valid('PENDING', 'PACKAGED', 'SHIPPED', 'COMPLETED', 'CANCELLED'),
+    paymentStatus: Joi.string().valid('PENDING', 'PAID', 'FAILED', 'REFUNDED'),
+    startDate: Joi.date().iso(),
+    endDate: Joi.date().iso()
+  });

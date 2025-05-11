@@ -107,24 +107,6 @@ export const getOrderTracking = async (req, res, next) => {
   }
 };
 
-
-// export const cancelUserOrder = async (req, res, next) => {
-//   try {
-//     const userId = req.user.id; // ID user dari token
-//     const orderId = req.params.orderId;
-    
-//     const cancelledOrder = await orderService.cancelUserOrder(userId, orderId);
-    
-//     res.status(200).json({
-//       status: 'success',
-//       data: cancelledOrder,
-//       message: 'Order cancelled successfully'
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
-
 export const cancelUserOrder = async (req, res, next) => {
   try {
     const userId = req.user.id; // Get user ID from auth middleware
@@ -150,6 +132,23 @@ export const cancelUserOrder = async (req, res, next) => {
       status: 'success',
       data: cancelledOrder,
       message: 'Order cancelled successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const getAllOrdersAdmin = async (req, res, next) => {
+  try {
+    const query = validate(orderAdminListValidation, req.query);
+    
+    const result = await orderService.getAllOrdersAdmin(query);
+
+    res.status(200).json({
+      status: 'success',
+      data: result.data,
+      meta: result.meta
     });
   } catch (error) {
     next(error);

@@ -137,3 +137,20 @@ export const searchDestinations = async (req, res, next) => {
   }
 };
 
+export const handleMidtransNotification = async (req, res, next) => {
+  try {
+    const notification = req.body;
+    
+    // Validasi signature jika diperlukan
+    // ...
+
+    const result = await checkoutService.handlePaymentNotification(notification);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};

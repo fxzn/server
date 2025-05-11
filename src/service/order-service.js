@@ -572,6 +572,93 @@ const completeOrder = async (userId, orderId) => {
   });
 };
 
+
+const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, startDate, endDate }) => {
+  const skip = (page - 1) * limit;
+  
+  const whereClause = {
+    ...(status && { status }),
+    ...(paymentStatus && { paymentStatus }),
+    ...((startDate || endDate) && {
+      createdAt: {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) })
+      }
+    })
+  };
+
+  try {
+    const [orders, totalOrders] = await Promise.all([
+      prismaClient.order.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          createdAt: true,
+          status: true,
+          trackingNumber: true,
+          shipping_name: true,
+          paymentStatus: true,
+          totalAmount: true,
+          customerName: true,
+          customerPhone: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true
+            }
+          },
+          items: {
+            select: {
+              quantity: true,
+              price: true,
+              productName: true,
+              product: {
+                select: {
+                  name: true,
+                  imageUrl: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prismaClient.order.count({ where: whereClause })
+    ]);
+
+    return {
+      data: orders.map(order => ({
+        ...order,
+        items: order.items.map(item => ({
+          name: item.productName || item.product.name,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.product.imageUrl,
+          total: item.price * item.quantity
+        })),
+        user: {
+          id: order.user.id,
+          email: order.user.email,
+          name: order.user.fullName
+        }
+      })),
+      meta: {
+        currentPage: page,
+        totalPages: Math.ceil(totalOrders / limit),
+        totalItems: totalOrders
+      }
+    };
+  } catch (error) {
+    console.error('Failed to fetch all orders:', error);
+    throw error;
+  }
+};
+
+
+
 async function sendOrderNotification(order) {
   try {
     // Implement your notification logic here (email, push notification, etc.)
@@ -593,5 +680,6 @@ export default {
   deleteOrderAdmin,
   trackShipping,
   completeOrder,
-  cancelUserOrder
+  cancelUserOrder,
+  getAllOrdersAdmin
 };
