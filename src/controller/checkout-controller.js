@@ -139,18 +139,38 @@ export const searchDestinations = async (req, res, next) => {
 
 export const handleMidtransNotification = async (req, res, next) => {
   try {
-    // Log raw body untuk debugging
-    console.log('[Midtrans] Raw Request Body:', req.body);
+    // Debugging: Log headers dan body
+    console.log('Received Headers:', req.headers);
+    console.log('Raw Body:', req.body);
 
-    // Handle content-type yang berbeda
     let notification;
+    
+    // Handle kedua format content-type
     if (req.headers['content-type'] === 'application/json') {
       notification = req.body;
     } else {
-      // Handle x-www-form-urlencoded jika diperlukan
-      notification = JSON.parse(JSON.stringify(req.body));
+      // Handle x-www-form-urlencoded
+      notification = req.body;
+      
+      // Jika body berupa string (karena form-urlencoded), parse ke JSON
+      if (typeof req.body === 'string') {
+        try {
+          notification = JSON.parse(req.body);
+        } catch (parseError) {
+          // Jika parse gagal, coba parse sebagai query string
+          notification = Object.fromEntries(new URLSearchParams(req.body).entries());
+        }
+      }
     }
 
+    console.log('Processed Notification:', notification);
+
+    // Pastikan notification adalah object
+    if (!notification || typeof notification !== 'object') {
+      throw new ResponseError(400, 'Invalid notification format');
+    }
+
+    // Proses notifikasi
     const result = await checkoutService.handlePaymentNotification(notification);
     
     res.status(200).json({
@@ -158,13 +178,14 @@ export const handleMidtransNotification = async (req, res, next) => {
       data: result
     });
   } catch (error) {
-    console.error('[Midtrans] Notification Error:', {
+    console.error('Notification Processing Error:', {
+      error: error.message,
       headers: req.headers,
       body: req.body,
-      error: error.stack
+      stack: error.stack
     });
     
-    // Return 200 ke Midtrans meskipun error (untuk menghindari retry)
+    // Tetap return 200 ke Midtrans untuk mencegah retry
     res.status(200).json({
       success: false,
       message: 'Notification processed with errors',
