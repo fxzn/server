@@ -90,6 +90,8 @@ const getOrderDetail = async (userId, orderId) => {
         estimatedDelivery: true,
         paymentMethod: true,
         paymentUrl: true,
+        paidAt: true, // Tambahkan ini
+        midtransResponse: true, // Tambahkan ini
         shippedAt: true,
         completedAt: true,
         cancelledAt: true,
@@ -99,7 +101,6 @@ const getOrderDetail = async (userId, orderId) => {
             price: true,
             productName: true,
             weight: true,
-            
             product: {
               select: {
                 name: true,
@@ -115,7 +116,28 @@ const getOrderDetail = async (userId, orderId) => {
       throw new ResponseError(404, 'Order not found or access denied');
     }
 
-    // Get tracking info if order is shipped and has tracking number
+    // Parse midtrans response jika ada
+    let paymentDetails = null;
+    if (order.midtransResponse) {
+      try {
+        const midtransData = JSON.parse(order.midtransResponse);
+        paymentDetails = {
+          method: midtransData.payment_type,
+          bank: midtransData.va_numbers?.[0]?.bank || midtransData.bank,
+          vaNumber: midtransData.va_numbers?.[0]?.va_number,
+          store: midtransData.store,
+          billKey: midtransData.bill_key,
+          billerCode: midtransData.biller_code,
+          transactionTime: midtransData.transaction_time,
+          settlementTime: midtransData.settlement_time,
+          fraudStatus: midtransData.fraud_status
+        };
+      } catch (e) {
+        console.error('Failed to parse midtrans response:', e);
+      }
+    }
+
+    // Get tracking info jika order sudah dikirim
     let trackingInfo = null;
     let trackingError = null;
     
@@ -132,6 +154,7 @@ const getOrderDetail = async (userId, orderId) => {
 
     return {
       ...order,
+      paymentDetails, // Tambahkan payment details
       trackingInfo,
       trackingError,
       shippingDetails: {
@@ -149,17 +172,7 @@ const getOrderDetail = async (userId, orderId) => {
         weight: item.weight,
         image: item.product.imageUrl,
         total: item.price * item.quantity
-      })),
-      // orderSummary: {
-      //   subtotal: order.totalAmount - order.shippingCost,
-      //   shippingCost: order.shippingCost,
-      //   totalAmount: order.totalAmount
-      // },
-      // timestamps: {
-      //   shippedAt: order.shippedAt,
-      //   completedAt: order.completedAt,
-      //   cancelledAt: order.cancelledAt
-      // }
+      }))
     };
   } catch (error) {
     console.error('Failed to fetch order details:', error);
