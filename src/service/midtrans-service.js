@@ -28,5 +28,15 @@ snap.httpClient.http_client.interceptors.response.use(
   }
 );
 
+// Tambahkan Core API untuk verifikasi
+const core = new midtransClient.CoreApi({
+  isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+  serverKey: process.env.MIDTRANS_SERVER_KEY,
+  clientKey: process.env.MIDTRANS_CLIENT_KEY
+});
+
 // module.exports = snap;
-export default snap;
+export default {
+  snap,
+  core
+};

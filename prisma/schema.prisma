@@ -136,7 +136,7 @@ model Order {
   cancelledAt           DateTime?       // Tambahkan ini
   midtransResponse      String? 
   paymentVaNumber       String? 
-   paymentBank     String?
+  paymentBank           String?
   reviews               Review[]
   paymentLogs           PaymentLog[]
 

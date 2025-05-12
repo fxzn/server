@@ -685,20 +685,6 @@ const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, 
 };
 
 
-async function sendOrderNotification(order) {
-  try {
-    // Implement your notification logic here (email, push notification, etc.)
-    console.log(`Notification sent for order ${order.id}`);
-    console.log('Notification details:', {
-      status: order.status,
-      trackingNumber: order.trackingNumber,
-      customerEmail: order.user.email
-    });
-  } catch (error) {
-    console.error('Failed to send notification:', error);
-  }
-}
-
 
 
 export default {
