@@ -1,33 +1,28 @@
 import midtransClient from 'midtrans-client';
 
-// // Initialize Snap client
-// const snap = new midtransClient.Snap({
-//   isProduction: false, // Set true untuk production
-//   serverKey: process.env.MIDTRANS_SERVER_KEY,
-//   clientKey: process.env.MIDTRANS_CLIENT_KEY
-// });
-
-// export default snap;
-
-
-// const midtransClient = require('midtrans-client');
+const isProduction = process.env.NODE_ENV === 'production';
 
 const snap = new midtransClient.Snap({
-  isProduction: false, // Ganti ke true untuk production
+  isProduction,
   serverKey: process.env.MIDTRANS_SERVER_KEY,
   clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
 
-// Tambahkan error handling
-snap.httpClient.http_client.defaults.timeout = 5000;
-snap.httpClient.http_client.interceptors.response.use(
-  response => response,
-  error => {
-    console.error('[Midtrans] API Error:', error.message);
-    throw error;
-  }
-);
+// Timeout default & error handling (optional tapi disarankan)
+if (snap.httpClient && snap.httpClient.http_client) {
+  snap.httpClient.http_client.defaults.timeout = 5000;
 
-// module.exports = snap;
+  snap.httpClient.http_client.interceptors.response.use(
+    response => response,
+    error => {
+      console.error('[Midtrans Error]', {
+        message: error.message,
+        url: error.config?.url,
+        data: error.response?.data
+      });
+      throw error;
+    }
+  );
+}
 
 export default snap;
