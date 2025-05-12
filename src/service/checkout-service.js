@@ -224,6 +224,9 @@ const checkPaymentStatus = async (orderId) => {
       paidAt: statusResponse.settlement_time || null,
       vaNumber: statusResponse.va_numbers?.[0]?.va_number,
       bank: statusResponse.va_numbers?.[0]?.bank
+  } ,  {
+    maxWait: 20000, // 20 detik maksimal menunggu
+    timeout: 15000  // 15 detik timeout
   };
 };
 

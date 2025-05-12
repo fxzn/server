@@ -137,18 +137,6 @@ export const searchDestinations = async (req, res, next) => {
   }
 };
 
-export const paymentNotification = async (req, res, next) => {
-  try {
-    const notification = req.body;
-    const result = await checkoutService.handlePaymentNotification(notification);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const checkPayment = async (req, res, next) => {
   try {
