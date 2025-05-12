@@ -179,7 +179,7 @@ model PaymentLog {
   paymentVaNumber     String?
   paymentTime         DateTime?
   paidAt              DateTime?
-  payload             String   // Untuk menyimpan data lengkap
+  payload             Json?
   createdAt           DateTime          @default(now())
   
   @@index([orderId])
