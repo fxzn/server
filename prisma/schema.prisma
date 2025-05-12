@@ -134,7 +134,9 @@ model Order {
   paidAt                DateTime?         // Waktu pembayaran berhasil
   createdAt             DateTime          @default(now())
   cancelledAt           DateTime?       // Tambahkan ini
-  midtransResponse      String?  
+  midtransResponse      String? 
+  paymentVaNumber       String? 
+   paymentBank     String?
   reviews               Review[]
   paymentLogs           PaymentLog[]
 
@@ -174,6 +176,8 @@ model PaymentLog {
   amount              Float
   status              PaymentStatus
   transactionId       String?           // ID transaksi dari Midtrans
+  paymentVaNumber     String?
+  paymentTime         DateTime?
   paidAt              DateTime?
   payload             String   // Untuk menyimpan data lengkap
   createdAt           DateTime          @default(now())

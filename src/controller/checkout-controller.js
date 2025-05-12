@@ -137,59 +137,40 @@ export const searchDestinations = async (req, res, next) => {
   }
 };
 
-export const handleMidtransNotification = async (req, res, next) => {
+export const paymentNotification = async (req, res, next) => {
   try {
-    // Debugging: Log headers dan body
-    console.log('Received Headers:', req.headers);
-    console.log('Raw Body:', req.body);
-
-    let notification;
-    
-    // Handle kedua format content-type
-    if (req.headers['content-type'] === 'application/json') {
-      notification = req.body;
-    } else {
-      // Handle x-www-form-urlencoded
-      notification = req.body;
-      
-      // Jika body berupa string (karena form-urlencoded), parse ke JSON
-      if (typeof req.body === 'string') {
-        try {
-          notification = JSON.parse(req.body);
-        } catch (parseError) {
-          // Jika parse gagal, coba parse sebagai query string
-          notification = Object.fromEntries(new URLSearchParams(req.body).entries());
-        }
-      }
-    }
-
-    console.log('Processed Notification:', notification);
-
-    // Pastikan notification adalah object
-    if (!notification || typeof notification !== 'object') {
-      throw new ResponseError(400, 'Invalid notification format');
-    }
-
-    // Proses notifikasi
+    const notification = req.body;
     const result = await checkoutService.handlePaymentNotification(notification);
-    
     res.status(200).json({
       success: true,
       data: result
     });
   } catch (error) {
-    console.error('Notification Processing Error:', {
-      error: error.message,
-      headers: req.headers,
-      body: req.body,
-      stack: error.stack
-    });
+    next(error);
+  }
+};
+
+export const checkPayment = async (req, res, next) => {
+  try {
+    const orderId = req.params.orderId;
+    const userId = req.user.id;
     
-    // Tetap return 200 ke Midtrans untuk mencegah retry
-    res.status(200).json({
-      success: false,
-      message: 'Notification processed with errors',
-      error: error.message
+    // Verify order ownership
+    const order = await prismaClient.order.findUnique({
+      where: { id: orderId, userId }
     });
+
+    if (!order) {
+      throw new ResponseError(404, 'Order not found or access denied');
+    }
+
+    const status = await checkoutService.checkPaymentStatus(orderId);
+    
+    res.status(200).json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    next(error);
   }
 };

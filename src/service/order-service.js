@@ -78,7 +78,6 @@ const getOrderDetail = async (userId, orderId) => {
         status: true,
         trackingNumber: true,
         shipping_name: true,
-        paymentStatus: true,
         totalAmount: true,
         shippingAddress: true,
         shippingCity: true,
@@ -88,9 +87,7 @@ const getOrderDetail = async (userId, orderId) => {
         customerPhone: true,
         shippingCost: true,
         estimatedDelivery: true,
-        paymentMethod: true,
         paymentUrl: true,
-        paidAt: true, // Tambahkan ini
         midtransResponse: true, // Tambahkan ini
         shippedAt: true,
         completedAt: true,
@@ -107,6 +104,23 @@ const getOrderDetail = async (userId, orderId) => {
                 imageUrl: true
               }
             }
+          }
+        },
+        paymentMethod: true,
+        paymentStatus: true,
+        paidAt: true,
+        paymentVaNumber: true,
+        paymentBank: true,
+        midtransOrderId: true,
+        paymentLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            status: true,
+            paymentMethod: true,
+            amount: true,
+            paymentTime: true,
+            transactionId: true
           }
         }
       }

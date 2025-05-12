@@ -210,177 +210,153 @@ const processCheckout = async (userId, checkoutData) => {
 
 const handlePaymentNotification = async (notification) => {
   try {
-    // 1. Logging untuk debugging
-    console.log('[Midtrans] Raw Notification Received:', JSON.stringify(notification, null, 2));
-
-    // 2. Validasi payload yang lebih fleksibel
-    if (!notification || typeof notification !== 'object') {
-      throw new ResponseError(400, 'Notification must be a valid object');
+    // First validate the notification structure
+    if (!notification || !notification.transaction_status) {
+      throw new ResponseError(400, 'Invalid notification payload');
     }
 
-    // 3. Handle berbagai format field dari Midtrans
-    const transactionStatus = notification.transaction_status || 
-                           notification['transaction-status'] || 
-                           notification.TransactionStatus;
+    // Verify the notification with Midtrans
+    const statusResponse = await snap.transaction.notification(notification);
+    
+    // Extract order ID
+    const orderId = statusResponse.order_id;
 
-    if (!transactionStatus) {
-      throw new ResponseError(400, 'Missing transaction status in notification');
-    }
-
-    // 4. Verifikasi notifikasi dengan Midtrans API
-    let statusResponse;
-    try {
-      console.log('[Midtrans] Verifying notification with Midtrans API...');
-      statusResponse = await snap.transaction.notification(notification);
-      console.log('[Midtrans] Verification Response:', statusResponse);
-    } catch (verifyError) {
-      console.error('[Midtrans] Verification Failed:', {
-        error: verifyError.message,
-        notification: notification
-      });
-      throw new ResponseError(400, 'Failed to verify notification with Midtrans');
-    }
-
-    // 5. Validasi response dari Midtrans
-    const orderId = statusResponse.order_id || statusResponse.orderId;
     if (!orderId) {
-      throw new ResponseError(400, 'Missing order ID in Midtrans response');
+      throw new ResponseError(400, 'Missing order_id in notification');
     }
 
-    // 6. Cari order di database
-    console.log(`[Midtrans] Looking for order: ${orderId}`);
+    // Find the order in database
     const order = await prismaClient.order.findUnique({
-      where: { id: orderId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true
-          }
-        }
-      }
+      where: { id: orderId }
     });
 
     if (!order) {
-      console.error(`[Midtrans] Order Not Found: ${orderId}`);
       throw new ResponseError(404, `Order not found: ${orderId}`);
     }
 
-    // 7. Tentukan status baru berdasarkan notifikasi
+    // Determine new status based on notification
     let newStatus = order.status;
     let paymentStatus = order.paymentStatus;
+    let paymentMethod = order.paymentMethod;
     let paidAt = order.paidAt;
-    let paymentMethod = statusResponse.payment_type;
 
-    console.log(`[Midtrans] Processing status: ${transactionStatus}`);
-    switch (transactionStatus.toLowerCase()) {
+    switch (statusResponse.transaction_status) {
       case 'capture':
         if (statusResponse.fraud_status === 'challenge') {
           newStatus = 'PENDING';
           paymentStatus = 'CHALLENGE';
-          console.log('[Midtrans] Payment challenged by fraud detection');
         } else if (statusResponse.fraud_status === 'accept') {
           newStatus = 'PAID';
           paymentStatus = 'PAID';
-          paidAt = new Date(statusResponse.settlement_time || statusResponse.transaction_time || new Date());
-          console.log('[Midtrans] Payment captured successfully');
+          paidAt = new Date(statusResponse.settlement_time || new Date());
         }
+        paymentMethod = statusResponse.payment_type;
         break;
-
       case 'settlement':
         newStatus = 'PAID';
         paymentStatus = 'PAID';
-        paidAt = new Date(statusResponse.settlement_time || statusResponse.transaction_time || new Date());
-        console.log('[Midtrans] Payment settled');
+        paymentMethod = statusResponse.payment_type;
+        paidAt = new Date(statusResponse.settlement_time || new Date());
         break;
-
       case 'cancel':
       case 'deny':
       case 'expire':
         newStatus = 'CANCELLED';
         paymentStatus = 'FAILED';
-        console.log('[Midtrans] Payment failed:', transactionStatus);
+        paymentMethod = statusResponse.payment_type;
         break;
-
       case 'pending':
         newStatus = 'PENDING';
         paymentStatus = 'PENDING';
-        console.log('[Midtrans] Payment pending');
+        paymentMethod = statusResponse.payment_type;
         break;
-
-      default:
-        console.warn('[Midtrans] Unknown transaction status:', transactionStatus);
-        throw new ResponseError(400, `Unknown transaction status: ${transactionStatus}`);
     }
 
-    // 8. Update order di database
-    console.log(`[Midtrans] Updating order ${orderId} to status: ${newStatus}`);
+    // Prepare update data
+    const updateData = {
+      status: newStatus,
+      paymentStatus,
+      paymentMethod,
+      ...(paidAt && { paidAt }),
+      ...(statusResponse.va_numbers && { 
+        paymentVaNumber: statusResponse.va_numbers[0]?.va_number,
+        paymentBank: statusResponse.va_numbers[0]?.bank
+      }),
+      ...(statusResponse.permata_va_number && {
+        paymentVaNumber: statusResponse.permata_va_number,
+        paymentBank: 'permata'
+      })
+    };
+
+    // Update the order status
     const updatedOrder = await prismaClient.order.update({
       where: { id: orderId },
-      data: {
-        status: newStatus,
-        paymentStatus,
-        paymentMethod,
-        paidAt,
-        midtransResponse: JSON.stringify(statusResponse),
-        ...(newStatus === 'PAID' && { paidAt: new Date() })
-      }
+      data: updateData
     });
 
-    // 9. Buat payment log
-    console.log(`[Midtrans] Creating payment log for order ${orderId}`);
+    // Create payment log
     await prismaClient.paymentLog.create({
       data: {
         orderId,
-        paymentMethod,
-        amount: parseFloat(statusResponse.gross_amount || '0'),
+        paymentMethod: statusResponse.payment_type,
+        amount: parseFloat(statusResponse.gross_amount),
         status: paymentStatus,
-        transactionId: statusResponse.transaction_id || `midtrans-${Date.now()}`,
+        transactionId: statusResponse.transaction_id,
         payload: JSON.stringify(statusResponse),
-        paidAt: paymentStatus === 'PAID' ? 
-          new Date(statusResponse.settlement_time || new Date()) : null,
-        userId: order.user.id
+        paymentTime: paidAt || null
       }
     });
 
-    // 10. Kirim notifikasi ke user jika pembayaran berhasil
-    if (newStatus === 'PAID') {
-      try {
-        console.log(`[Midtrans] Sending payment confirmation to ${order.user.email}`);
-        await sendPaymentConfirmationEmail({
-          email: order.user.email,
-          orderId,
-          amount: statusResponse.gross_amount,
-          paymentMethod,
-          paymentDate: paidAt
-        });
-      } catch (emailError) {
-        console.error('[Midtrans] Failed to send confirmation email:', emailError);
-      }
-    }
-
-    console.log('[Midtrans] Notification processed successfully');
     return { 
       status: newStatus, 
       paymentStatus,
       paymentMethod,
-      paidAt,
-      orderId
+      paidAt
     };
-
+    
   } catch (error) {
-    console.error('[Midtrans] Notification Processing Error:', {
+    console.error('Payment notification error:', {
       error: error.message,
-      notification: notification,
+      notification,
       stack: error.stack
     });
-    
-    // Tetap return 200 ke Midtrans untuk menghindari retry
-    throw new ResponseError(200, `Notification processed with error: ${error.message}`);
+    throw new ResponseError(500, 'Failed to process payment notification');
   }
 };
 
+// Add this new function to check payment status
+const checkPaymentStatus = async (orderId) => {
+  try {
+    const order = await prismaClient.order.findUnique({
+      where: { id: orderId },
+      select: { midtransOrderId: true }
+    });
+
+    if (!order) {
+      throw new ResponseError(404, 'Order not found');
+    }
+
+    if (!order.midtransOrderId) {
+      throw new ResponseError(400, 'This order has no payment record');
+    }
+
+    const statusResponse = await snap.transaction.status(order.midtransOrderId);
+
+    // Update status order if needed
+    if (statusResponse.transaction_status) {
+      await handlePaymentNotification(statusResponse);
+    }
+
+    return statusResponse;
+  } catch (error) {
+    console.error('Failed to check payment status:', error);
+    throw new ResponseError(500, 'Failed to check payment status');
+  }
+};
+
+// Update your exports to include the new function
 export default {
   processCheckout,
-  handlePaymentNotification
+  handlePaymentNotification,
+  checkPaymentStatus
 };
