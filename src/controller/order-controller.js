@@ -1,6 +1,6 @@
 import { validate } from '../validation/validation.js';
 import orderService from '../service/order-service.js';
-import { orderAdminUpdateValidation, orderQueryValidation } from '../validation/order-validation.js';
+import { orderAdminListValidation, orderAdminUpdateValidation, orderQueryValidation } from '../validation/order-validation.js';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 
@@ -154,7 +154,6 @@ export const getAllOrdersAdmin = async (req, res, next) => {
     next(error);
   }
 };
-
 
 function formatOrderResponse(order) {
   return {
