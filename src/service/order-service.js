@@ -88,7 +88,7 @@ const getOrderDetail = async (userId, orderId) => {
         shippingCost: true,
         estimatedDelivery: true,
         paymentUrl: true,
-        midtransResponse: true, // Tambahkan ini
+        // midtransResponse: true, // Tambahkan ini
         shippedAt: true,
         completedAt: true,
         cancelledAt: true,
