@@ -44,7 +44,7 @@ const validateStockAvailability = (items) => {
 const createMidtransTransaction = async (order, user) => {
   try {
     // Use database order ID as Midtrans order ID for easier tracking
-    const midtransOrderId = `ORDER-${order.id}-${Date.now()}`;
+    const midtransOrderId = order.id;
 
     const itemDetails = order.items.map(item => ({
       id: item.productId,
@@ -113,7 +113,6 @@ const createMidtransTransaction = async (order, user) => {
     throw new ResponseError(500, 'Failed to create payment transaction');
   }
 };
-
 
 const processCheckout = async (userId, checkoutData) => {
   return await prismaClient.$transaction(async (prisma) => {
