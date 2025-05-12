@@ -155,67 +155,6 @@ export const getAllOrdersAdmin = async (req, res, next) => {
   }
 };
 
-// export const paymentNotification = async (req, res, next) => {
-//   try {
-//     const notification = req.body;
-    
-//     // Verifikasi dan update data pembayaran
-//     const updatedOrder = await orderService.handlePaymentNotification(notification);
-
-//     res.status(200).json({
-//       status: 'success',
-//       data: {
-//         orderId: updatedOrder.id,
-//         paymentStatus: updatedOrder.paymentStatus,
-//         paymentMethod: updatedOrder.paymentMethod,
-//         paidAt: updatedOrder.paidAt
-//       }
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
-
-
-export const checkOrderPaymentStatus = async (req, res, next) => {
-  try {
-    const { orderId } = req.params;
-    const { userId } = req;
-    
-    // Verifikasi order milik user
-    const order = await prismaClient.order.findFirst({
-      where: { id: orderId, userId },
-      select: { midtransOrderId: true }
-    });
-    
-    if (!order) {
-      throw new ResponseError(404, 'Order not found');
-    }
-    
-    // Cek status di Midtrans
-    const paymentStatus = await checkPaymentStatus(order.midtransOrderId);
-    
-    // Update database
-    await prismaClient.order.update({
-      where: { id: orderId },
-      data: {
-        paymentStatus: paymentStatus.status,
-        paymentMethod: paymentStatus.paymentMethod,
-        paidAt: paymentStatus.paymentTime ? new Date(paymentStatus.paymentTime) : null,
-        midtransResponse: JSON.stringify(paymentStatus.rawResponse)
-      }
-    });
-    
-    res.json({
-      status: paymentStatus.status,
-      method: paymentStatus.paymentMethod,
-      paidAt: paymentStatus.paymentTime
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 
 
 function formatOrderResponse(order) {
