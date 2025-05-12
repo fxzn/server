@@ -2,197 +2,257 @@ import axios from 'axios';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 
+// const getOrderList = async (userId, { page = 1, limit = 10 }) => {
+//   const skip = (page - 1) * limit;
+
+//   try {
+//     const [orders, totalOrders] = await Promise.all([
+//       prismaClient.order.findMany({
+//         where: { userId },
+//         select: {
+//           id: true,
+//           createdAt: true,
+//           status: true,
+//           trackingNumber: true,
+//           shipping_name: true,
+//           paymentStatus: true,
+//           totalAmount: true,
+//           items: {
+//             select: {
+//               quantity: true,
+//               price: true,
+//               productName: true,
+//               product: {
+//                 select: {
+//                   name: true,
+//                   imageUrl: true
+//                 }
+//               }
+//             }
+//           }
+//         },
+//         orderBy: { createdAt: 'desc' },
+//         skip,
+//         take: limit
+//       }),
+//       prismaClient.order.count({ where: { userId } })
+//     ]);
+
+//     if (orders.length === 0) {
+//       throw new ResponseError(404, 'No orders found for this user');
+//     }
+
+//     return {
+//       data: orders.map(order => ({
+//         ...order,
+//         items: order.items.map(item => ({
+//           name: item.productName || item.product.name,
+//           quantity: item.quantity,
+//           price: item.price,
+//           image: item.product.imageUrl,
+//           total: item.price * item.quantity
+//         }))
+//       })),
+//       meta: {
+//         currentPage: page,
+//         totalPages: Math.ceil(totalOrders / limit),
+//         totalItems: totalOrders
+//       }
+//     };
+//   } catch (error) {
+//     console.error('Failed to fetch orders:', error);
+//     throw error;
+//   }
+// };
+
+// const getOrderDetail = async (userId, orderId) => {
+//   try {
+//     const order = await prismaClient.order.findUnique({
+//       where: { 
+//         id: orderId,
+//         userId 
+//       },
+//       select: {
+//         id: true,
+//         createdAt: true,
+//         status: true,
+//         trackingNumber: true,
+//         shipping_name: true,
+//         totalAmount: true,
+//         shippingAddress: true,
+//         shippingCity: true,
+//         shippingProvince: true,
+//         shippingPostCode: true,
+//         customerName: true,
+//         customerPhone: true,
+//         shippingCost: true,
+//         estimatedDelivery: true,
+//         paymentUrl: true,
+//         midtransResponse: true, // Tambahkan ini
+//         shippedAt: true,
+//         completedAt: true,
+//         cancelledAt: true,
+//         items: {
+//           select: {
+//             quantity: true,
+//             price: true,
+//             productName: true,
+//             weight: true,
+//             product: {
+//               select: {
+//                 name: true,
+//                 imageUrl: true
+//               }
+//             }
+//           }
+//         },
+//         paymentMethod: true,
+//         paymentStatus: true,
+//         paidAt: true,
+//         paymentVaNumber: true,
+//         paymentBank: true,
+//         midtransOrderId: true,
+//         paymentLogs: {
+//           orderBy: { createdAt: 'desc' },
+//           take: 1,
+//           select: {
+//             status: true,
+//             paymentMethod: true,
+//             amount: true,
+//             paymentTime: true,
+//             transactionId: true
+//           }
+//         }
+//       }
+//     });
+
+//     if (!order) {
+//       throw new ResponseError(404, 'Order not found or access denied');
+//     }
+
+//     // Parse midtrans response jika ada
+//     let paymentDetails = null;
+//     if (order.midtransResponse) {
+//       try {
+//         const midtransData = JSON.parse(order.midtransResponse);
+//         paymentDetails = {
+//           method: midtransData.payment_type,
+//           bank: midtransData.va_numbers?.[0]?.bank || midtransData.bank,
+//           vaNumber: midtransData.va_numbers?.[0]?.va_number,
+//           store: midtransData.store,
+//           billKey: midtransData.bill_key,
+//           billerCode: midtransData.biller_code,
+//           transactionTime: midtransData.transaction_time,
+//           settlementTime: midtransData.settlement_time,
+//           fraudStatus: midtransData.fraud_status
+//         };
+//       } catch (e) {
+//         console.error('Failed to parse midtrans response:', e);
+//       }
+//     }
+
+//     // Get tracking info jika order sudah dikirim
+//     let trackingInfo = null;
+//     let trackingError = null;
+    
+//     if (order.status === 'SHIPPED' && order.trackingNumber && order.shipping_name) {
+//       try {
+//         trackingInfo = await trackShipping(
+//           order.shipping_name.toLowerCase(),
+//           order.trackingNumber
+//         );
+//       } catch (error) {
+//         trackingError = error.message;
+//       }
+//     }
+
+//     return {
+//       ...order,
+//       paymentDetails, // Tambahkan payment details
+//       trackingInfo,
+//       trackingError,
+//       shippingDetails: {
+//         recipientName: order.customerName,
+//         phoneNumber: order.customerPhone,
+//         address: order.shippingAddress,
+//         city: order.shippingCity,
+//         province: order.shippingProvince,
+//         postalCode: order.shippingPostCode
+//       },
+//       items: order.items.map(item => ({
+//         name: item.productName || item.product.name,
+//         quantity: item.quantity,
+//         price: item.price,
+//         weight: item.weight,
+//         image: item.product.imageUrl,
+//         total: item.price * item.quantity
+//       }))
+//     };
+//   } catch (error) {
+//     console.error('Failed to fetch order details:', error);
+//     throw error;
+//   }
+// };
+
+
 const getOrderList = async (userId, { page = 1, limit = 10 }) => {
   const skip = (page - 1) * limit;
 
-  try {
-    const [orders, totalOrders] = await Promise.all([
-      prismaClient.order.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          createdAt: true,
-          status: true,
-          trackingNumber: true,
-          shipping_name: true,
-          paymentStatus: true,
-          totalAmount: true,
-          items: {
-            select: {
-              quantity: true,
-              price: true,
-              productName: true,
-              product: {
-                select: {
-                  name: true,
-                  imageUrl: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prismaClient.order.count({ where: { userId } })
-    ]);
-
-    if (orders.length === 0) {
-      throw new ResponseError(404, 'No orders found for this user');
-    }
-
-    return {
-      data: orders.map(order => ({
-        ...order,
-        items: order.items.map(item => ({
-          name: item.productName || item.product.name,
-          quantity: item.quantity,
-          price: item.price,
-          image: item.product.imageUrl,
-          total: item.price * item.quantity
-        }))
-      })),
-      meta: {
-        currentPage: page,
-        totalPages: Math.ceil(totalOrders / limit),
-        totalItems: totalOrders
-      }
-    };
-  } catch (error) {
-    console.error('Failed to fetch orders:', error);
-    throw error;
-  }
-};
-
-const getOrderDetail = async (userId, orderId) => {
-  try {
-    const order = await prismaClient.order.findUnique({
-      where: { 
-        id: orderId,
-        userId 
-      },
-      select: {
-        id: true,
-        createdAt: true,
-        status: true,
-        trackingNumber: true,
-        shipping_name: true,
-        totalAmount: true,
-        shippingAddress: true,
-        shippingCity: true,
-        shippingProvince: true,
-        shippingPostCode: true,
-        customerName: true,
-        customerPhone: true,
-        shippingCost: true,
-        estimatedDelivery: true,
-        paymentUrl: true,
-        midtransResponse: true, // Tambahkan ini
-        shippedAt: true,
-        completedAt: true,
-        cancelledAt: true,
+  const [orders, total] = await Promise.all([
+    prismaClient.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      include: {
         items: {
-          select: {
-            quantity: true,
-            price: true,
-            productName: true,
-            weight: true,
-            product: {
-              select: {
-                name: true,
-                imageUrl: true
-              }
-            }
-          }
-        },
-        paymentMethod: true,
-        paymentStatus: true,
-        paidAt: true,
-        paymentVaNumber: true,
-        paymentBank: true,
-        midtransOrderId: true,
-        paymentLogs: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            status: true,
-            paymentMethod: true,
-            amount: true,
-            paymentTime: true,
-            transactionId: true
-          }
+          include: { product: { select: { name: true, imageUrl: true } } }
         }
       }
-    });
+    }),
+    prismaClient.order.count({ where: { userId } })
+  ]);
 
-    if (!order) {
-      throw new ResponseError(404, 'Order not found or access denied');
-    }
-
-    // Parse midtrans response jika ada
-    let paymentDetails = null;
-    if (order.midtransResponse) {
-      try {
-        const midtransData = JSON.parse(order.midtransResponse);
-        paymentDetails = {
-          method: midtransData.payment_type,
-          bank: midtransData.va_numbers?.[0]?.bank || midtransData.bank,
-          vaNumber: midtransData.va_numbers?.[0]?.va_number,
-          store: midtransData.store,
-          billKey: midtransData.bill_key,
-          billerCode: midtransData.biller_code,
-          transactionTime: midtransData.transaction_time,
-          settlementTime: midtransData.settlement_time,
-          fraudStatus: midtransData.fraud_status
-        };
-      } catch (e) {
-        console.error('Failed to parse midtrans response:', e);
-      }
-    }
-
-    // Get tracking info jika order sudah dikirim
-    let trackingInfo = null;
-    let trackingError = null;
-    
-    if (order.status === 'SHIPPED' && order.trackingNumber && order.shipping_name) {
-      try {
-        trackingInfo = await trackShipping(
-          order.shipping_name.toLowerCase(),
-          order.trackingNumber
-        );
-      } catch (error) {
-        trackingError = error.message;
-      }
-    }
-
-    return {
+  return {
+    data: orders.map(order => ({
       ...order,
-      paymentDetails, // Tambahkan payment details
-      trackingInfo,
-      trackingError,
-      shippingDetails: {
-        recipientName: order.customerName,
-        phoneNumber: order.customerPhone,
-        address: order.shippingAddress,
-        city: order.shippingCity,
-        province: order.shippingProvince,
-        postalCode: order.shippingPostCode
-      },
       items: order.items.map(item => ({
         name: item.productName || item.product.name,
         quantity: item.quantity,
         price: item.price,
-        weight: item.weight,
-        image: item.product.imageUrl,
-        total: item.price * item.quantity
+        image: item.product.imageUrl
       }))
-    };
-  } catch (error) {
-    console.error('Failed to fetch order details:', error);
-    throw error;
-  }
+    })),
+    meta: {
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total
+    }
+  };
 };
+
+const getOrderDetail = async (userId, orderId) => {
+  const order = await prismaClient.order.findFirst({
+    where: { id: orderId, userId },
+    include: {
+      items: { include: { product: true } },
+      paymentLogs: { orderBy: { createdAt: 'desc' }, take: 1 }
+    }
+  });
+
+  if (!order) throw new ResponseError(404, 'Order not found');
+
+  return {
+    ...order,
+    items: order.items.map(item => ({
+      name: item.productName || item.product.name,
+      price: item.price,
+      quantity: item.quantity,
+      image: item.product.imageUrl
+    }))
+  };
+};
+
 
 const updateOrderAdmin = async (orderId, { status, trackingNumber, shipping_name
 

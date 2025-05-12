@@ -4,15 +4,53 @@ import { orderAdminListValidation, orderAdminUpdateValidation, orderQueryValidat
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 
+// export const getUserOrders = async (req, res, next) => {
+//   try {
+//     const userId = req.user.id;
+//     const query = validate(orderQueryValidation, req.query);
+    
+//     const result = await orderService.getOrderList(userId, query);
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: result.data,
+//       meta: result.meta
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
+// export const getOrderDetails = async (req, res, next) => {
+//   try {
+//     const userId = req.user.id;
+//     const orderId = req.params.orderId;
+
+//     if (!orderId) {
+//       throw new ResponseError(400, 'Order ID is required');
+//     }
+
+//     const order = await orderService.getOrderDetail(userId, orderId);
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: order
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
+
 export const getUserOrders = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const query = validate(orderQueryValidation, req.query);
-    
+
     const result = await orderService.getOrderList(userId, query);
 
     res.status(200).json({
-      status: 'success',
+      success: true,
       data: result.data,
       meta: result.meta
     });
@@ -26,20 +64,20 @@ export const getOrderDetails = async (req, res, next) => {
     const userId = req.user.id;
     const orderId = req.params.orderId;
 
-    if (!orderId) {
-      throw new ResponseError(400, 'Order ID is required');
-    }
+    if (!orderId) throw new ResponseError(400, 'Order ID is required');
 
     const order = await orderService.getOrderDetail(userId, orderId);
 
     res.status(200).json({
-      status: 'success',
+      success: true,
       data: order
     });
   } catch (error) {
     next(error);
   }
 };
+
+
 
 export const adminUpdateOrder = async (req, res, next) => {
   try {
