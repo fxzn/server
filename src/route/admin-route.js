@@ -4,6 +4,7 @@ import { deleteUser, getAllUsersForAdmin } from '../controller/user-controller.j
 import { addProduct, deleteProduct, updateProduct } from '../controller/product-controller.js';
 import { uploadProductImageOptional } from '../utils/upload.js';
 import { adminDeleteOrder, adminUpdateOrder, getAllOrdersAdmin } from '../controller/order-controller.js';
+import { getOrderStats, getProductStats, getRevenueStats, getUserStats } from '../controller/dashboard-controller.js';
 
 
 
@@ -20,6 +21,12 @@ adminRouter.delete('/api/v1/admin/products/:id', deleteProduct);
 adminRouter.patch('/api/v1/admin/orders/:orderId', adminUpdateOrder);
 adminRouter.delete('/api/v1/admin/orders/:orderId', adminDeleteOrder);
 adminRouter.get('/api/v1/admin/orders', getAllOrdersAdmin);
+
+
+adminRouter.get('/api/v1/admin/dashboard/orders', getOrderStats);
+adminRouter.get('/api/v1/admin/dashboard/products', getProductStats);
+adminRouter.get('/api/v1/admin/dashboard/revenue', getRevenueStats);
+adminRouter.get('/api/v1/admin/dashboard/users', getUserStats);
 
 
 

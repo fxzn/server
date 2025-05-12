@@ -684,7 +684,130 @@ const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, 
   }
 };
 
+const getOrderDetailAdmin = async (orderId) => {
+  try {
+    const order = await prismaClient.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+        trackingNumber: true,
+        shipping_name: true,
+        totalAmount: true,
+        shippingAddress: true,
+        shippingCity: true,
+        shippingProvince: true,
+        shippingPostCode: true,
+        customerName: true,
+        customerPhone: true,
+        shippingCost: true,
+        estimatedDelivery: true,
+        paymentUrl: true,
+        midtransResponse: true,
+        shippedAt: true,
+        completedAt: true,
+        cancelledAt: true,
+        items: {
+          select: {
+            quantity: true,
+            price: true,
+            productName: true,
+            weight: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                imageUrl: true
+              }
+            }
+          }
+        },
+        paymentMethod: true,
+        paymentStatus: true,
+        paidAt: true,
+        paymentVaNumber: true,
+        paymentBank: true,
+        midtransOrderId: true,
+        paymentLogs: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            status: true,
+            paymentMethod: true,
+            amount: true,
+            paymentTime: true,
+            transactionId: true,
+            createdAt: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true
+          }
+        }
+      }
+    });
 
+    if (!order) {
+      throw new ResponseError(404, 'Order not found');
+    }
+
+    // Parse midtrans response
+    let paymentDetails = null;
+    if (order.midtransResponse) {
+      try {
+        paymentDetails = JSON.parse(order.midtransResponse);
+      } catch (e) {
+        console.error('Failed to parse midtrans response:', e);
+      }
+    }
+
+    // Get tracking info if shipped
+    let trackingInfo = null;
+    let trackingError = null;
+    
+    if (order.status === 'SHIPPED' && order.trackingNumber && order.shipping_name) {
+      try {
+        trackingInfo = await trackShipping(
+          order.shipping_name.toLowerCase(),
+          order.trackingNumber
+        );
+      } catch (error) {
+        trackingError = error.message;
+      }
+    }
+
+    return {
+      ...order,
+      paymentDetails,
+      trackingInfo,
+      trackingError,
+      shippingDetails: {
+        recipientName: order.customerName,
+        phoneNumber: order.customerPhone,
+        address: order.shippingAddress,
+        city: order.shippingCity,
+        province: order.shippingProvince,
+        postalCode: order.shippingPostCode
+      },
+      items: order.items.map(item => ({
+        id: item.product.id,
+        name: item.productName || item.product.name,
+        quantity: item.quantity,
+        price: item.price,
+        weight: item.weight,
+        image: item.product.imageUrl,
+        total: item.price * item.quantity
+      }))
+    };
+  } catch (error) {
+    console.error('Failed to fetch order details:', error);
+    throw error;
+  }
+};
 
 
 export default {
@@ -696,4 +819,5 @@ export default {
   completeOrder,
   cancelUserOrder,
   getAllOrdersAdmin,
+  getOrderDetailAdmin
 };
