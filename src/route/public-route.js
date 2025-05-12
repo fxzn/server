@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { forgotPassword, googleAuth, login, register, resetPassword } from '../controller/user-controller.js';
 import { getAllProducts, getProductById } from '../controller/product-controller.js';
+// import paymentController from '../controller/payment-controller.js';
 
 
 
@@ -16,5 +17,11 @@ publicRouter.post('/api/v1/auth/google', googleAuth);
 // product router
 publicRouter.get('/api/v1/products', getAllProducts);
 publicRouter.get('/api/v1/products/:id', getProductById);
+
+
+// publicRouter.post('/payment-webhook', 
+//     // express.raw({ type: 'application/json' }),
+//     paymentController.handlePaymentNotification
+// );
 
 export default publicRouter

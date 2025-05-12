@@ -3,15 +3,13 @@ import { authMiddleware } from '../middleware/auth-middleware.js';
 import { logout } from '../controller/user-controller.js';
 import upload from '../utils/avatar.js';
 import { addItemToCart, clearCart, getCart, removeItemFromCart, updateCartItem } from '../controller/cart-controller.js';
-import { paymentNotification, searchDestinations } from '../controller/checkout-controller.js';
+import { searchDestinations } from '../controller/checkout-controller.js';
 import { getShippingOptions } from '../controller/checkout-controller.js';
 import { checkout } from '../controller/checkout-controller.js';
-import { cancelUserOrder, checkOrderPaymentStatus, getOrderDetails, getOrderTracking, getUserOrders } from '../controller/order-controller.js';
+import { cancelUserOrder, getOrderDetails, getOrderTracking, getUserOrders } from '../controller/order-controller.js';
 import { completeOrder, createReview, getProductReviews } from '../controller/review-controller.js';
 import { addToWishlist, checkProductInWishlist, getWishlist, removeFromWishlist } from '../controller/wishlist-controller.js';
 import { changePassword, getProfile, updateProfile, uploadAvatar } from '../controller/profile-controller.js';
-import paymentController from '../controller/payment-controller.js';
-// import { handlePaymentNotification } from '../controller/notification-controller.js';
 
 
 const router = Router();
@@ -39,10 +37,7 @@ router.delete('/api/v1/cart', clearCart);
 // Checkout router
 router.post('/api/v1/checkout', checkout);
 
-router.post('/payment-webhook', 
-    // express.raw({ type: 'application/json' }),
-    paymentController.handlePaymentNotification
-);
+
 
 
 // Raja ongkir route

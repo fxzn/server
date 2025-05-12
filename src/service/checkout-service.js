@@ -1,6 +1,7 @@
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 import komerceService from './komerce-service.js';
+import midtransService from './midtrans-service.js';
 import snap from './midtrans-service.js';
 
 const calculateCartTotals = (items) => {
@@ -95,7 +96,7 @@ const createMidtransTransaction = async (order, user) => {
       }
     };
 
-    const transaction = await snap.createTransaction(parameter);
+    const transaction = await midtransService.snap.createTransaction(parameter);
     
     return {
       paymentUrl: transaction.redirect_url,
@@ -215,7 +216,7 @@ const checkPaymentStatus = async (orderId) => {
   
   if (!order) throw new ResponseError(404, 'Order not found');
   
-  const statusResponse = await core.transaction.status(order.midtransOrderId);
+  const statusResponse = await midtransService.core.transaction.status(order.midtransOrderId);
   
   return {
       status: mapMidtransStatus(statusResponse.transaction_status),
