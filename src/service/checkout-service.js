@@ -2,7 +2,7 @@ import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 import komerceService from './komerce-service.js';
 import midtransService from './midtrans-service.js';
-import snap from './midtrans-service.js';
+
 
 const calculateCartTotals = (items) => {
   return items.reduce((acc, item) => {
@@ -44,7 +44,7 @@ const validateStockAvailability = (items) => {
 const createMidtransTransaction = async (order, user) => {
   try {
     // Use database order ID as Midtrans order ID for easier tracking
-    const midtransOrderId = order.id;
+    const midtransOrderId = `ORDER-${order.id}-${Date.now()}`;
 
     const itemDetails = order.items.map(item => ({
       id: item.productId,
@@ -113,6 +113,7 @@ const createMidtransTransaction = async (order, user) => {
     throw new ResponseError(500, 'Failed to create payment transaction');
   }
 };
+
 
 const processCheckout = async (userId, checkoutData) => {
   return await prismaClient.$transaction(async (prisma) => {

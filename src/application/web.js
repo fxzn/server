@@ -8,6 +8,7 @@ import webhookRouter from '../route/webhook-route.js';
 
 
 export const web = express();
+web.use(webhookRouter);
 
 web.use(express.json());
 web.use(cors())
@@ -15,7 +16,7 @@ web.use(cors())
 web.use(publicRoute);
 web.use(router);
 web.use(adminRouter);
-web.use(webhookRouter);
+
 
 
 web.use(errorMiddleware);
