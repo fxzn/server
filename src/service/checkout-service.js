@@ -137,6 +137,9 @@ const processCheckout = async (userId, data) => {
       },
       include: { items: true }
     });
+  }, {
+    maxWait: 20000, // 20 detik maksimal menunggu
+    timeout: 15000  // 15 detik timeout
   });
 };
 
