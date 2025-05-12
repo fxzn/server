@@ -208,6 +208,8 @@ const processCheckout = async (userId, checkoutData) => {
 
 
 
+// In your existing checkout-service.js, add these modifications:
+
 const handlePaymentNotification = async (notification) => {
   try {
     // First validate the notification structure
@@ -360,3 +362,4 @@ export default {
   handlePaymentNotification,
   checkPaymentStatus
 };
+
