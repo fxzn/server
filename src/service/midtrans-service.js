@@ -124,6 +124,33 @@ export const verifyNotification = (notification, serverKey) => {
   return signatureKey === notification.signature_key;
 };
 
+
+export const checkPaymentStatus = async (orderId) => {
+  try {
+    const statusResponse = await core.transaction.status(orderId);
+    
+    // Mapping status Midtrans ke status kita
+    const statusMap = {
+      'capture': 'PAID',
+      'settlement': 'PAID',
+      'pending': 'PENDING',
+      'deny': 'FAILED',
+      'expire': 'EXPIRED',
+      'cancel': 'CANCELLED'
+    };
+    
+    return {
+      status: statusMap[statusResponse.transaction_status] || 'UNKNOWN',
+      paymentMethod: statusResponse.payment_type,
+      paymentTime: statusResponse.settlement_time || statusResponse.transaction_time,
+      rawResponse: statusResponse
+    };
+  } catch (error) {
+    console.error('Error checking payment status:', error);
+    throw error;
+  }
+};
+
 // export default {
 //   createSnapTransaction,
 //   checkTransactionStatus,

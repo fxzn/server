@@ -6,10 +6,11 @@ import { addItemToCart, clearCart, getCart, removeItemFromCart, updateCartItem }
 import { paymentNotification, searchDestinations } from '../controller/checkout-controller.js';
 import { getShippingOptions } from '../controller/checkout-controller.js';
 import { checkout } from '../controller/checkout-controller.js';
-import { cancelUserOrder, getOrderDetails, getOrderTracking, getUserOrders } from '../controller/order-controller.js';
+import { cancelUserOrder, checkOrderPaymentStatus, getOrderDetails, getOrderTracking, getUserOrders } from '../controller/order-controller.js';
 import { completeOrder, createReview, getProductReviews } from '../controller/review-controller.js';
 import { addToWishlist, checkProductInWishlist, getWishlist, removeFromWishlist } from '../controller/wishlist-controller.js';
 import { changePassword, getProfile, updateProfile, uploadAvatar } from '../controller/profile-controller.js';
+import { handlePaymentNotification } from '../controller/notification-controller.js';
 
 
 const router = Router();
@@ -36,9 +37,9 @@ router.delete('/api/v1/cart', clearCart);
     
 // Checkout router
 router.post('/api/v1/checkout', checkout);
-router.post('/payment/notification', paymentNotification);
-router.get('/:orderId/payment/status', paymentNotification);
-// router.get('/orders/:orderId/payment-status', checkP);
+
+router.post('/api/v1/payments/notifications', handlePaymentNotification);
+router.get('/api/v1/orders/:orderId/payment-status', checkOrderPaymentStatus);
 
 
 // Raja ongkir route

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
-import midtransService from './midtrans-service.js';
 
 const getOrderList = async (userId, { page = 1, limit = 10 }) => {
   const skip = (page - 1) * limit;
@@ -701,102 +700,6 @@ async function sendOrderNotification(order) {
 }
 
 
-// order-service.js
-const handlePaymentNotification = async (notification) => {
-  try {
-    // 1. Verifikasi signature key (penting untuk keamanan!)
-    const isVerified = verifyMidtransSignature(notification);
-    if (!isVerified) throw new ResponseError(403, 'Invalid signature');
-
-    // 2. Cari order berdasarkan midtransOrderId
-    const order = await prismaClient.order.findUnique({
-      where: { midtransOrderId: notification.order_id }
-    });
-
-    if (!order) throw new ResponseError(404, 'Order not found');
-
-    // 3. Map status dari Midtrans ke sistem kita
-    const paymentStatus = mapPaymentStatus(notification.transaction_status);
-    const paymentMethod = notification.payment_type.toUpperCase();
-
-    // 4. Update hanya field yang dibutuhkan
-    const updatedOrder = await prismaClient.order.update({
-      where: { id: order.id },
-      data: {
-        paymentStatus,
-        paymentMethod,
-        paidAt: paymentStatus === 'PAID' ? new Date(notification.settlement_time || notification.transaction_time) : null,
-        midtransResponse: JSON.stringify(notification) // Simpan raw data untuk audit
-      }
-    });
-
-    return updatedOrder;
-  } catch (error) {
-    console.error('Payment notification error:', error);
-    throw error;
-  }
-};
-
-// Helper function
-const verifyMidtransSignature = (notification) => {
-  const crypto = require('crypto');
-  const signature = crypto
-    .createHash('sha512')
-    .update(`${notification.order_id}${notification.status_code}${notification.gross_amount}${process.env.MIDTRANS_SERVER_KEY}`)
-    .digest('hex');
-  
-  return signature === notification.signature_key;
-};
-
-const mapPaymentStatus = (transactionStatus) => {
-  const statusMap = {
-    'capture': 'PAID',
-    'settlement': 'PAID',
-    'pending': 'PENDING',
-    'deny': 'FAILED',
-    'expire': 'EXPIRED'
-  };
-  return statusMap[transactionStatus] || 'PENDING';
-};
-
-
-
-// Helper function to send payment notification
-async function sendPaymentNotification(order, user) {
-  try {
-    const emailContent = {
-      to: user.email,
-      subject: `Payment Confirmation for Order #${order.id}`,
-      html: `
-        <h2>Payment Successful</h2>
-        <p>Hello ${user.fullName},</p>
-        <p>Your payment for order <strong>#${order.id}</strong> has been successfully processed.</p>
-        <p>Amount: Rp ${order.totalAmount.toLocaleString('id-ID')}</p>
-        <p>Payment Method: ${order.paymentMethod}</p>
-        ${order.paymentVaNumber ? `<p>Virtual Account: ${order.paymentVaNumber}</p>` : ''}
-        <p>Thank you for your purchase!</p>
-      `
-    };
-    await sendEmail(emailContent);
-  } catch (error) {
-    console.error('Failed to send payment notification:', error);
-  }
-}
-
-// // ... tambahkan ke export di bagian bawah file ...
-// export default {
-//   getOrderList,
-//   getOrderDetail,
-//   updateOrderAdmin,
-//   deleteOrderAdmin,
-//   trackShipping,
-//   completeOrder,
-//   cancelUserOrder,
-//   getAllOrdersAdmin,
-//   createOrderPayment,      // Tambahkan ini
-//   handlePaymentNotification // Tambahkan ini
-// };
-
 
 export default {
   getOrderList,
@@ -807,5 +710,4 @@ export default {
   completeOrder,
   cancelUserOrder,
   getAllOrdersAdmin,
-  handlePaymentNotification
 };
