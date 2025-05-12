@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
+import midtransService from './midtrans-service.js';
 
 const getOrderList = async (userId, { page = 1, limit = 10 }) => {
   const skip = (page - 1) * limit;
@@ -319,185 +320,6 @@ const deleteOrderAdmin = async (orderId) => {
   });
 };
 
-
-// const cancelUserOrder = async (userId, orderId) => {
-//   return await prismaClient.$transaction(async (prisma) => {
-//     // 1. Retrieve the order with all necessary relations
-//     const order = await prisma.order.findUnique({
-//       where: { id: orderId },
-//       include: {
-//         user: {
-//           select: {
-//             id: true,
-//             email: true,
-//             fullName: true
-//           }
-//         },
-//         items: {
-//           include: {
-//             product: {
-//               select: {
-//                 id: true,
-//                 name: true,
-//                 stock: true
-//               }
-//             }
-//           }
-//         }
-//       }
-//     });
-
-//     // 2. Validate order existence and ownership
-//     if (!order) {
-//       throw new ResponseError(404, 'Order not found');
-//     }
-
-//     if (order.user.id !== userId) {
-//       throw new ResponseError(403, 'You can only cancel your own orders');
-//     }
-
-//     // 3. Validate order can be cancelled
-//     const cancellableStatuses = ['PENDING', 'PACKAGED'];
-//     if (!cancellableStatuses.includes(order.status)) {
-//       throw new ResponseError(400, 
-//         `Order cannot be cancelled because it's already ${order.status}. ` +
-//         `Only orders with status ${cancellableStatuses.join(' or ')} can be cancelled`
-//       );
-//     }
-
-//     // 4. Check if order has payment and needs Midtrans cancellation
-//     let midtransResponse = null;
-//     if (order.midtransOrderId && order.paymentStatus === 'PAID') {
-//       try {
-//         const snap = new midtransClient.Snap({
-//           isProduction: process.env.NODE_ENV === 'production',
-//           serverKey: process.env.MIDTRANS_SERVER_KEY
-//         });
-
-//         midtransResponse = await snap.transaction.cancel(order.midtransOrderId);
-//         console.log('Midtrans cancellation successful:', midtransResponse);
-//       } catch (error) {
-//         console.error('Midtrans cancellation failed:', error);
-//         throw new ResponseError(500, 
-//           'Payment cancellation failed. Please contact customer support'
-//         );
-//       }
-//     }
-
-//     // 5. Update order status
-//     const updatedOrder = await prisma.order.update({
-//       where: { id: orderId },
-//       data: {
-//         status: 'CANCELLED',
-//         paymentStatus: order.paymentStatus === 'PAID' ? 'REFUNDED' : 'FAILED',
-//         cancelledAt: new Date()
-//       },
-//       include: {
-//         items: {
-//           select: {
-//             productId: true,
-//             quantity: true,
-//             product: {
-//               select: {
-//                 name: true
-//               }
-//             }
-//           }
-//         }
-//       }
-//     });
-
-//     // 6. Restore product stock
-//     await Promise.all(
-//       order.items.map(item =>
-//         prisma.product.update({
-//           where: { id: item.product.id },
-//           data: { stock: { increment: item.quantity } }
-//         })
-//       )
-//     );
-
-//     // 7. Create audit log
-//     await prisma.paymentLog.create({
-//       data: {
-//         orderId,
-//         paymentMethod: order.paymentMethod,
-//         amount: order.totalAmount,
-//         status: 'REFUNDED',
-//         transactionId: order.midtransOrderId,
-//         payload: JSON.stringify({
-//           action: 'USER_CANCELLATION',
-//           userId,
-//           midtransResponse,
-//           restoredItems: order.items.map(item => ({
-//             productId: item.product.id,
-//             productName: item.product.name,
-//             quantity: item.quantity
-//           })),
-//           previousStatus: order.status,
-//           previousPaymentStatus: order.paymentStatus
-//         })
-//       }
-//     });
-
-//     // 8. Send notifications (in background)
-//     sendCancellationNotifications(updatedOrder, order.user);
-
-//     return {
-//       ...updatedOrder,
-//       midtransCancellation: midtransResponse ? {
-//         status: midtransResponse.status_message,
-//         transactionId: midtransResponse.transaction_id
-//       } : null
-//     };
-//   });
-// };
-
-
-
-// // Helper function for notifications (runs in background)
-// async function sendCancellationNotifications(order, user) {
-//   try {
-//     // 1. Send email to user
-//     const emailContent = {
-//       to: user.email,
-//       subject: `Your Order #${order.id} Has Been Cancelled`,
-//       html: `
-//         <h2>Order Cancellation Confirmation</h2>
-//         <p>Hello ${user.fullName},</p>
-//         <p>Your order <strong>#${order.id}</strong> has been successfully cancelled.</p>
-//         ${order.paymentStatus === 'REFUNDED' ? 
-//           '<p>Your refund will be processed within 3-5 business days.</p>' : ''}
-//         <p>Cancelled items:</p>
-//         <ul>
-//           ${order.items.map(item => `
-//             <li>${item.quantity}x ${item.product.name}</li>
-//           `).join('')}
-//         </ul>
-//         <p>Thank you for using our service.</p>
-//       `
-//     };
-//     await sendEmail(emailContent);
-
-//     // 2. Notify admin (if payment was involved)
-//     if (order.paymentStatus === 'REFUNDED') {
-//       await prisma.notification.create({
-//         data: {
-//           type: 'ORDER_REFUND',
-//           title: `Order #${order.id} cancelled with refund`,
-//           message: `User ${user.email} cancelled paid order. Refund processed.`,
-//           metadata: {
-//             orderId: order.id,
-//             userId: user.id,
-//             amount: order.totalAmount
-//           }
-//         }
-//       });
-//     }
-//   } catch (error) {
-//     console.error('Failed to send cancellation notifications:', error);
-//   }
-// }
 
 
 
@@ -879,6 +701,101 @@ async function sendOrderNotification(order) {
 }
 
 
+// order-service.js
+const handlePaymentNotification = async (notification) => {
+  try {
+    // 1. Verifikasi signature key (penting untuk keamanan!)
+    const isVerified = verifyMidtransSignature(notification);
+    if (!isVerified) throw new ResponseError(403, 'Invalid signature');
+
+    // 2. Cari order berdasarkan midtransOrderId
+    const order = await prismaClient.order.findUnique({
+      where: { midtransOrderId: notification.order_id }
+    });
+
+    if (!order) throw new ResponseError(404, 'Order not found');
+
+    // 3. Map status dari Midtrans ke sistem kita
+    const paymentStatus = mapPaymentStatus(notification.transaction_status);
+    const paymentMethod = notification.payment_type.toUpperCase();
+
+    // 4. Update hanya field yang dibutuhkan
+    const updatedOrder = await prismaClient.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus,
+        paymentMethod,
+        paidAt: paymentStatus === 'PAID' ? new Date(notification.settlement_time || notification.transaction_time) : null,
+        midtransResponse: JSON.stringify(notification) // Simpan raw data untuk audit
+      }
+    });
+
+    return updatedOrder;
+  } catch (error) {
+    console.error('Payment notification error:', error);
+    throw error;
+  }
+};
+
+// Helper function
+const verifyMidtransSignature = (notification) => {
+  const crypto = require('crypto');
+  const signature = crypto
+    .createHash('sha512')
+    .update(`${notification.order_id}${notification.status_code}${notification.gross_amount}${process.env.MIDTRANS_SERVER_KEY}`)
+    .digest('hex');
+  
+  return signature === notification.signature_key;
+};
+
+const mapPaymentStatus = (transactionStatus) => {
+  const statusMap = {
+    'capture': 'PAID',
+    'settlement': 'PAID',
+    'pending': 'PENDING',
+    'deny': 'FAILED',
+    'expire': 'EXPIRED'
+  };
+  return statusMap[transactionStatus] || 'PENDING';
+};
+
+
+
+// Helper function to send payment notification
+async function sendPaymentNotification(order, user) {
+  try {
+    const emailContent = {
+      to: user.email,
+      subject: `Payment Confirmation for Order #${order.id}`,
+      html: `
+        <h2>Payment Successful</h2>
+        <p>Hello ${user.fullName},</p>
+        <p>Your payment for order <strong>#${order.id}</strong> has been successfully processed.</p>
+        <p>Amount: Rp ${order.totalAmount.toLocaleString('id-ID')}</p>
+        <p>Payment Method: ${order.paymentMethod}</p>
+        ${order.paymentVaNumber ? `<p>Virtual Account: ${order.paymentVaNumber}</p>` : ''}
+        <p>Thank you for your purchase!</p>
+      `
+    };
+    await sendEmail(emailContent);
+  } catch (error) {
+    console.error('Failed to send payment notification:', error);
+  }
+}
+
+// // ... tambahkan ke export di bagian bawah file ...
+// export default {
+//   getOrderList,
+//   getOrderDetail,
+//   updateOrderAdmin,
+//   deleteOrderAdmin,
+//   trackShipping,
+//   completeOrder,
+//   cancelUserOrder,
+//   getAllOrdersAdmin,
+//   createOrderPayment,      // Tambahkan ini
+//   handlePaymentNotification // Tambahkan ini
+// };
 
 
 export default {
@@ -889,5 +806,6 @@ export default {
   trackShipping,
   completeOrder,
   cancelUserOrder,
-  getAllOrdersAdmin
+  getAllOrdersAdmin,
+  handlePaymentNotification
 };

@@ -37,6 +37,7 @@ router.delete('/api/v1/cart', clearCart);
 // Checkout router
 router.post('/api/v1/checkout', checkout);
 router.post('/payment/notification', paymentNotification);
+router.get('/:orderId/payment/status', paymentNotification);
 // router.get('/orders/:orderId/payment-status', checkP);
 
 

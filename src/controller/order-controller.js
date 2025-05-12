@@ -155,6 +155,28 @@ export const getAllOrdersAdmin = async (req, res, next) => {
   }
 };
 
+export const paymentNotification = async (req, res, next) => {
+  try {
+    const notification = req.body;
+    
+    // Verifikasi dan update data pembayaran
+    const updatedOrder = await orderService.handlePaymentNotification(notification);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        orderId: updatedOrder.id,
+        paymentStatus: updatedOrder.paymentStatus,
+        paymentMethod: updatedOrder.paymentMethod,
+        paidAt: updatedOrder.paidAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 function formatOrderResponse(order) {
   return {
     id: order.id,
