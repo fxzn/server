@@ -1,7 +1,7 @@
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 import komerceService from './komerce-service.js';
-import { createSnapTransaction } from './midtrans-service.js';
+import snap from './midtrans-service.js';
 
 const calculateCartTotals = (items) => {
   return items.reduce((acc, item) => {
@@ -95,7 +95,7 @@ const createMidtransTransaction = async (order, user) => {
       }
     };
 
-    const transaction = await createSnapTransaction(parameter);
+    const transaction = await snap.createTransaction(parameter);
     
     return {
       paymentUrl: transaction.redirect_url,
@@ -211,5 +211,6 @@ const processCheckout = async (userId, checkoutData) => {
 
 export default {
   processCheckout,
+
 };
 
