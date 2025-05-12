@@ -44,7 +44,8 @@ const validateStockAvailability = (items) => {
 const createMidtransTransaction = async (order, user) => {
   try {
     // Use database order ID as Midtrans order ID for easier tracking
-    const midtransOrderId = order.id;
+    // const midtransOrderId = order.id;
+    const midtransOrderId = `ORDER-${order.id}-${Date.now()}`;
 
     const itemDetails = order.items.map(item => ({
       id: item.productId,
