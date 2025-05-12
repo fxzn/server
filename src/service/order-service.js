@@ -2,6 +2,201 @@ import axios from 'axios';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 
+// const getOrderList = async (userId, { page = 1, limit = 10 }) => {
+//   const skip = (page - 1) * limit;
+
+//   try {
+//     const [orders, totalOrders] = await Promise.all([
+//       prismaClient.order.findMany({
+//         where: { userId },
+//         select: {
+//           id: true,
+//           createdAt: true,
+//           status: true,
+//           trackingNumber: true,
+//           shipping_name: true,
+//           paymentStatus: true,
+//           totalAmount: true,
+//           items: {
+//             select: {
+//               quantity: true,
+//               price: true,
+//               productName: true,
+//               product: {
+//                 select: {
+//                   name: true,
+//                   imageUrl: true
+//                 }
+//               }
+//             }
+//           }
+//         },
+//         orderBy: { createdAt: 'desc' },
+//         skip,
+//         take: limit
+//       }),
+//       prismaClient.order.count({ where: { userId } })
+//     ]);
+
+//     if (orders.length === 0) {
+//       throw new ResponseError(404, 'No orders found for this user');
+//     }
+
+//     return {
+//       data: orders.map(order => ({
+//         ...order,
+//         items: order.items.map(item => ({
+//           name: item.productName || item.product.name,
+//           quantity: item.quantity,
+//           price: item.price,
+//           image: item.product.imageUrl,
+//           total: item.price * item.quantity
+//         }))
+//       })),
+//       meta: {
+//         currentPage: page,
+//         totalPages: Math.ceil(totalOrders / limit),
+//         totalItems: totalOrders
+//       }
+//     };
+//   } catch (error) {
+//     console.error('Failed to fetch orders:', error);
+//     throw error;
+//   }
+// };
+
+// const getOrderDetail = async (userId, orderId) => {
+//   try {
+//     const order = await prismaClient.order.findUnique({
+//       where: { 
+//         id: orderId,
+//         userId 
+//       },
+//       select: {
+//         id: true,
+//         createdAt: true,
+//         status: true,
+//         trackingNumber: true,
+//         shipping_name: true,
+//         totalAmount: true,
+//         shippingAddress: true,
+//         shippingCity: true,
+//         shippingProvince: true,
+//         shippingPostCode: true,
+//         customerName: true,
+//         customerPhone: true,
+//         shippingCost: true,
+//         estimatedDelivery: true,
+//         paymentUrl: true,
+//         midtransResponse: true, // Tambahkan ini
+//         shippedAt: true,
+//         completedAt: true,
+//         cancelledAt: true,
+//         items: {
+//           select: {
+//             quantity: true,
+//             price: true,
+//             productName: true,
+//             weight: true,
+//             product: {
+//               select: {
+//                 name: true,
+//                 imageUrl: true
+//               }
+//             }
+//           }
+//         },
+//         paymentMethod: true,
+//         paymentStatus: true,
+//         paidAt: true,
+//         paymentVaNumber: true,
+//         paymentBank: true,
+//         midtransOrderId: true,
+//         paymentLogs: {
+//           orderBy: { createdAt: 'desc' },
+//           take: 1,
+//           select: {
+//             status: true,
+//             paymentMethod: true,
+//             amount: true,
+//             paymentTime: true,
+//             transactionId: true
+//           }
+//         }
+//       }
+//     });
+
+//     if (!order) {
+//       throw new ResponseError(404, 'Order not found or access denied');
+//     }
+
+//     // Parse midtrans response jika ada
+//     let paymentDetails = null;
+//     if (order.midtransResponse) {
+//       try {
+//         const midtransData = JSON.parse(order.midtransResponse);
+//         paymentDetails = {
+//           method: midtransData.payment_type,
+//           bank: midtransData.va_numbers?.[0]?.bank || midtransData.bank,
+//           vaNumber: midtransData.va_numbers?.[0]?.va_number,
+//           store: midtransData.store,
+//           billKey: midtransData.bill_key,
+//           billerCode: midtransData.biller_code,
+//           transactionTime: midtransData.transaction_time,
+//           settlementTime: midtransData.settlement_time,
+//           fraudStatus: midtransData.fraud_status
+//         };
+//       } catch (e) {
+//         console.error('Failed to parse midtrans response:', e);
+//       }
+//     }
+
+//     // Get tracking info jika order sudah dikirim
+//     let trackingInfo = null;
+//     let trackingError = null;
+    
+//     if (order.status === 'SHIPPED' && order.trackingNumber && order.shipping_name) {
+//       try {
+//         trackingInfo = await trackShipping(
+//           order.shipping_name.toLowerCase(),
+//           order.trackingNumber
+//         );
+//       } catch (error) {
+//         trackingError = error.message;
+//       }
+//     }
+
+//     return {
+//       ...order,
+//       paymentDetails, // Tambahkan payment details
+//       trackingInfo,
+//       trackingError,
+//       shippingDetails: {
+//         recipientName: order.customerName,
+//         phoneNumber: order.customerPhone,
+//         address: order.shippingAddress,
+//         city: order.shippingCity,
+//         province: order.shippingProvince,
+//         postalCode: order.shippingPostCode
+//       },
+//       items: order.items.map(item => ({
+//         name: item.productName || item.product.name,
+//         quantity: item.quantity,
+//         price: item.price,
+//         weight: item.weight,
+//         image: item.product.imageUrl,
+//         total: item.price * item.quantity
+//       }))
+//     };
+//   } catch (error) {
+//     console.error('Failed to fetch order details:', error);
+//     throw error;
+//   }
+// };
+
+
+import midtransClient from 'midtrans-client';
+
 const getOrderList = async (userId, { page = 1, limit = 10 }) => {
   const skip = (page - 1) * limit;
 
@@ -16,6 +211,8 @@ const getOrderList = async (userId, { page = 1, limit = 10 }) => {
           trackingNumber: true,
           shipping_name: true,
           paymentStatus: true,
+          paymentMethod: true,
+          paidAt: true,
           totalAmount: true,
           items: {
             select: {
@@ -44,7 +241,17 @@ const getOrderList = async (userId, { page = 1, limit = 10 }) => {
 
     return {
       data: orders.map(order => ({
-        ...order,
+        id: order.id,
+        createdAt: order.createdAt,
+        status: order.status,
+        trackingNumber: order.trackingNumber,
+        shippingName: order.shipping_name,
+        totalAmount: order.totalAmount,
+        payment: {
+          status: order.paymentStatus,
+          method: order.paymentMethod,
+          paidAt: order.paidAt
+        },
         items: order.items.map(item => ({
           name: item.productName || item.product.name,
           quantity: item.quantity,
@@ -75,6 +282,7 @@ const getOrderDetail = async (userId, orderId) => {
       select: {
         id: true,
         createdAt: true,
+        updatedAt: true,
         status: true,
         trackingNumber: true,
         shipping_name: true,
@@ -88,10 +296,16 @@ const getOrderDetail = async (userId, orderId) => {
         shippingCost: true,
         estimatedDelivery: true,
         paymentUrl: true,
-        midtransResponse: true, // Tambahkan ini
+        midtransResponse: true,
         shippedAt: true,
         completedAt: true,
         cancelledAt: true,
+        paymentStatus: true,
+        paymentMethod: true,
+        paidAt: true,
+        paymentVaNumber: true,
+        paymentBank: true,
+        midtransOrderId: true,
         items: {
           select: {
             quantity: true,
@@ -100,27 +314,23 @@ const getOrderDetail = async (userId, orderId) => {
             weight: true,
             product: {
               select: {
+                id: true,
                 name: true,
                 imageUrl: true
               }
             }
           }
         },
-        paymentMethod: true,
-        paymentStatus: true,
-        paidAt: true,
-        paymentVaNumber: true,
-        paymentBank: true,
-        midtransOrderId: true,
         paymentLogs: {
           orderBy: { createdAt: 'desc' },
-          take: 1,
+          take: 5,
           select: {
             status: true,
             paymentMethod: true,
             amount: true,
             paymentTime: true,
-            transactionId: true
+            transactionId: true,
+            createdAt: true
           }
         }
       }
@@ -130,7 +340,7 @@ const getOrderDetail = async (userId, orderId) => {
       throw new ResponseError(404, 'Order not found or access denied');
     }
 
-    // Parse midtrans response jika ada
+    // Parse midtrans response if available
     let paymentDetails = null;
     if (order.midtransResponse) {
       try {
@@ -144,14 +354,17 @@ const getOrderDetail = async (userId, orderId) => {
           billerCode: midtransData.biller_code,
           transactionTime: midtransData.transaction_time,
           settlementTime: midtransData.settlement_time,
-          fraudStatus: midtransData.fraud_status
+          fraudStatus: midtransData.fraud_status,
+          currency: midtransData.currency,
+          statusCode: midtransData.status_code,
+          statusMessage: midtransData.status_message
         };
       } catch (e) {
         console.error('Failed to parse midtrans response:', e);
       }
     }
 
-    // Get tracking info jika order sudah dikirim
+    // Get tracking info if order has been shipped
     let trackingInfo = null;
     let trackingError = null;
     
@@ -166,11 +379,35 @@ const getOrderDetail = async (userId, orderId) => {
       }
     }
 
+    // Format payment logs
+    const paymentLogs = order.paymentLogs.map(log => ({
+      status: log.status,
+      method: log.paymentMethod,
+      amount: log.amount,
+      time: log.paymentTime || log.createdAt,
+      transactionId: log.transactionId
+    }));
+
     return {
-      ...order,
-      paymentDetails, // Tambahkan payment details
-      trackingInfo,
-      trackingError,
+      id: order.id,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      status: order.status,
+      trackingNumber: order.trackingNumber,
+      shippingName: order.shipping_name,
+      totalAmount: order.totalAmount,
+      shippingCost: order.shippingCost,
+      estimatedDelivery: order.estimatedDelivery,
+      payment: {
+        status: order.paymentStatus,
+        method: order.paymentMethod,
+        paidAt: order.paidAt,
+        vaNumber: order.paymentVaNumber,
+        bank: order.paymentBank,
+        midtransOrderId: order.midtransOrderId,
+        details: paymentDetails,
+        logs: paymentLogs
+      },
       shippingDetails: {
         recipientName: order.customerName,
         phoneNumber: order.customerPhone,
@@ -179,20 +416,123 @@ const getOrderDetail = async (userId, orderId) => {
         province: order.shippingProvince,
         postalCode: order.shippingPostCode
       },
+      timeline: {
+        shippedAt: order.shippedAt,
+        completedAt: order.completedAt,
+        cancelledAt: order.cancelledAt
+      },
       items: order.items.map(item => ({
+        id: item.product.id,
         name: item.productName || item.product.name,
         quantity: item.quantity,
         price: item.price,
         weight: item.weight,
         image: item.product.imageUrl,
         total: item.price * item.quantity
-      }))
+      })),
+      trackingInfo,
+      trackingError,
+      paymentUrl: order.paymentUrl
     };
   } catch (error) {
     console.error('Failed to fetch order details:', error);
     throw error;
   }
 };
+
+const checkPaymentStatus = async (orderId) => {
+  try {
+    const order = await prismaClient.order.findUnique({
+      where: { id: orderId },
+      select: { midtransOrderId: true }
+    });
+
+    if (!order || !order.midtransOrderId) {
+      throw new ResponseError(404, 'Order or Midtrans reference not found');
+    }
+
+    // Initialize Core API client
+    const core = new midtransClient.CoreApi({
+      isProduction: process.env.NODE_ENV === 'production',
+      serverKey: process.env.MIDTRANS_SERVER_KEY,
+      clientKey: process.env.MIDTRANS_CLIENT_KEY
+    });
+
+    // Check status from Midtrans
+    const statusResponse = await core.transaction.status(order.midtransOrderId);
+
+    // Determine payment status
+    let paymentStatus = 'PENDING';
+    let paidAt = null;
+    
+    if (['capture', 'settlement'].includes(statusResponse.transaction_status)) {
+      paymentStatus = 'PAID';
+      paidAt = new Date(statusResponse.settlement_time || statusResponse.transaction_time);
+    } else if (statusResponse.transaction_status === 'expire') {
+      paymentStatus = 'EXPIRED';
+    } else if (['deny', 'cancel'].includes(statusResponse.transaction_status)) {
+      paymentStatus = 'FAILED';
+    }
+
+    // Update order in database
+    const updatedOrder = await prismaClient.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus,
+        paymentMethod: statusResponse.payment_type,
+        paidAt,
+        midtransResponse: JSON.stringify(statusResponse),
+        ...(statusResponse.va_numbers?.[0] && {
+          paymentVaNumber: statusResponse.va_numbers[0].va_number,
+          paymentBank: statusResponse.va_numbers[0].bank
+        })
+      },
+      include: {
+        items: {
+          select: {
+            product: {
+              select: {
+                name: true
+              }
+            },
+            quantity: true
+          }
+        }
+      }
+    });
+
+    // Create payment log
+    await prismaClient.paymentLog.create({
+      data: {
+        orderId: orderId,
+        status: paymentStatus,
+        paymentMethod: statusResponse.payment_type,
+        amount: statusResponse.gross_amount,
+        paymentTime: paidAt,
+        transactionId: statusResponse.transaction_id,
+        payload: statusResponse
+      }
+    });
+
+    return {
+      status: paymentStatus,
+      method: statusResponse.payment_type,
+      paidAt,
+      midtransStatus: statusResponse.transaction_status,
+      amount: statusResponse.gross_amount,
+      currency: statusResponse.currency,
+      orderId: orderId,
+      midtransOrderId: order.midtransOrderId
+    };
+  } catch (error) {
+    console.error('Error checking payment status:', error);
+    throw new ResponseError(500, 'Failed to check payment status');
+  }
+};
+
+
+
+
 
 
 const updateOrderAdmin = async (orderId, { status, trackingNumber, shipping_name
@@ -710,4 +1050,5 @@ export default {
   completeOrder,
   cancelUserOrder,
   getAllOrdersAdmin,
+  checkPaymentStatus
 };
