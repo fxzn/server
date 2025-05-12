@@ -199,7 +199,7 @@ const processCheckout = async (userId, checkoutData) => {
       },
       include: { items: { include: { product: true } } }}
     )
-  }, {
+  },  {
     maxWait: 20000, // 20 detik maksimal menunggu
     timeout: 15000  // 15 detik timeout
   });
@@ -208,9 +208,156 @@ const processCheckout = async (userId, checkoutData) => {
 
 
 
+// // In your existing checkout-service.js, add these modifications:
 
+// const handlePaymentNotification = async (notification) => {
+//   try {
+//     // First validate the notification structure
+//     if (!notification || !notification.transaction_status) {
+//       throw new ResponseError(400, 'Invalid notification payload');
+//     }
+
+//     // Verify the notification with Midtrans
+//     const statusResponse = await snap.transaction.notification(notification);
+    
+//     // Extract order ID
+//     const orderId = statusResponse.order_id;
+
+//     if (!orderId) {
+//       throw new ResponseError(400, 'Missing order_id in notification');
+//     }
+
+//     // Find the order in database
+//     const order = await prismaClient.order.findUnique({
+//       where: { id: orderId }
+//     });
+
+//     if (!order) {
+//       throw new ResponseError(404, `Order not found: ${orderId}`);
+//     }
+
+//     // Determine new status based on notification
+//     let newStatus = order.status;
+//     let paymentStatus = order.paymentStatus;
+//     let paymentMethod = order.paymentMethod;
+//     let paidAt = order.paidAt;
+
+//     switch (statusResponse.transaction_status) {
+//       case 'capture':
+//         if (statusResponse.fraud_status === 'challenge') {
+//           newStatus = 'PENDING';
+//           paymentStatus = 'CHALLENGE';
+//         } else if (statusResponse.fraud_status === 'accept') {
+//           newStatus = 'PAID';
+//           paymentStatus = 'PAID';
+//           paidAt = new Date(statusResponse.settlement_time || new Date());
+//         }
+//         paymentMethod = statusResponse.payment_type;
+//         break;
+//       case 'settlement':
+//         newStatus = 'PAID';
+//         paymentStatus = 'PAID';
+//         paymentMethod = statusResponse.payment_type;
+//         paidAt = new Date(statusResponse.settlement_time || new Date());
+//         break;
+//       case 'cancel':
+//       case 'deny':
+//       case 'expire':
+//         newStatus = 'CANCELLED';
+//         paymentStatus = 'FAILED';
+//         paymentMethod = statusResponse.payment_type;
+//         break;
+//       case 'pending':
+//         newStatus = 'PENDING';
+//         paymentStatus = 'PENDING';
+//         paymentMethod = statusResponse.payment_type;
+//         break;
+//     }
+
+//     // Prepare update data
+//     const updateData = {
+//       status: newStatus,
+//       paymentStatus,
+//       paymentMethod,
+//       ...(paidAt && { paidAt }),
+//       ...(statusResponse.va_numbers && { 
+//         paymentVaNumber: statusResponse.va_numbers[0]?.va_number,
+//         paymentBank: statusResponse.va_numbers[0]?.bank
+//       }),
+//       ...(statusResponse.permata_va_number && {
+//         paymentVaNumber: statusResponse.permata_va_number,
+//         paymentBank: 'permata'
+//       })
+//     };
+
+//     // Update the order status
+//     const updatedOrder = await prismaClient.order.update({
+//       where: { id: orderId },
+//       data: updateData
+//     });
+
+//     // Create payment log
+//     await prismaClient.paymentLog.create({
+//       data: {
+//         orderId,
+//         paymentMethod: statusResponse.payment_type,
+//         amount: parseFloat(statusResponse.gross_amount),
+//         status: paymentStatus,
+//         transactionId: statusResponse.transaction_id,
+//         payload: JSON.stringify(statusResponse),
+//         paymentTime: paidAt || null
+//       }
+//     });
+
+//     return { 
+//       status: newStatus, 
+//       paymentStatus,
+//       paymentMethod,
+//       paidAt
+//     };
+    
+//   } catch (error) {
+//     console.error('Payment notification error:', {
+//       error: error.message,
+//       notification,
+//       stack: error.stack
+//     });
+//     throw new ResponseError(500, 'Failed to process payment notification');
+//   }
+// };
+
+// // Add this new function to check payment status
+// const checkPaymentStatus = async (orderId) => {
+//   try {
+//     const order = await prismaClient.order.findUnique({
+//       where: { id: orderId },
+//       select: { midtransOrderId: true }
+//     });
+
+//     if (!order) {
+//       throw new ResponseError(404, 'Order not found');
+//     }
+
+//     if (!order.midtransOrderId) {
+//       throw new ResponseError(400, 'This order has no payment record');
+//     }
+
+//     const statusResponse = await snap.transaction.status(order.midtransOrderId);
+
+//     // Update status order if needed
+//     if (statusResponse.transaction_status) {
+//       await handlePaymentNotification(statusResponse);
+//     }
+
+//     return statusResponse;
+//   } catch (error) {
+//     console.error('Failed to check payment status:', error);
+//     throw new ResponseError(500, 'Failed to check payment status');
+//   }
+// };
+
+// Update your exports to include the new function
 export default {
-  processCheckout,
-
+  processCheckout
 };
 
