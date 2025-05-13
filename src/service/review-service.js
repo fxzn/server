@@ -115,10 +115,9 @@ const completeOrder = async (userId, orderId) => {
   });
 };
 
-const getProductReviews = async (productId, { page = 1, limit = 10 }) => {
-  const skip = (page - 1) * limit;
+const getProductReviews = async ( productId ) => {
   
-  const [reviews, total] = await Promise.all([
+  const [ reviews ] = await Promise.all([
     prismaClient.review.findMany({
       where: { productId },
       include: {
@@ -130,19 +129,19 @@ const getProductReviews = async (productId, { page = 1, limit = 10 }) => {
         }
       },
       orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit
+      // skip,
+      // take: limit
     }),
     prismaClient.review.count({ where: { productId } })
   ]);
 
   return {
     data: reviews,
-    meta: {
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalItems: total
-    }
+    // meta: {
+    //   currentPage: page,
+    //   totalPages: Math.ceil(total / limit),
+    //   totalItems: total
+    // }
   };
 };
 

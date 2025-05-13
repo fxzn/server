@@ -93,7 +93,7 @@ const getAllProducts = async () => {
   // Format the response with additional rating info
   return products.map(product => ({
     ...product,
-    weightInGrams: product.weight * 1000,
+    // weightInGrams: product.weight * 1000,
     // Ensure ratingAvg is never null
     ratingAvg: product.ratingAvg || 0,
     // Ensure reviewCount is never null
@@ -169,7 +169,7 @@ const getProductById = async (id) => {
 
   return {
     ...product,
-    weightInGrams: product.weight * 1000,
+    // weightInGrams: product.weight * 1000,
     ratingAvg: product.ratingAvg || 0,
     // reviewCount: product.reviewCount || 0,
     ratingDistribution: distribution,

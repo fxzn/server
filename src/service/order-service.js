@@ -2,11 +2,10 @@ import axios from 'axios';
 import { prismaClient } from '../application/database.js';
 import { ResponseError } from '../error/response-error.js';
 
-const getOrderList = async (userId, { page = 1, limit = 10 }) => {
-  const skip = (page - 1) * limit;
+const getOrderList = async ( userId ) => {
 
   try {
-    const [orders, totalOrders] = await Promise.all([
+    const [ orders ] = await Promise.all([
       prismaClient.order.findMany({
         where: { userId },
         select: {
@@ -32,8 +31,6 @@ const getOrderList = async (userId, { page = 1, limit = 10 }) => {
           }
         },
         orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
       }),
       prismaClient.order.count({ where: { userId } })
     ]);
@@ -53,11 +50,6 @@ const getOrderList = async (userId, { page = 1, limit = 10 }) => {
           total: item.price * item.quantity
         }))
       })),
-      meta: {
-        currentPage: page,
-        totalPages: Math.ceil(totalOrders / limit),
-        totalItems: totalOrders
-      }
     };
   } catch (error) {
     console.error('Failed to fetch orders:', error);
@@ -600,9 +592,8 @@ const completeOrder = async (userId, orderId) => {
 };
 
 
-const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, startDate, endDate }) => {
-  const skip = (page - 1) * limit;
-  
+
+const getAllOrdersAdmin = async ({ status, paymentStatus, startDate, endDate }) => {
   const whereClause = {
     ...(status && { status }),
     ...(paymentStatus && { paymentStatus }),
@@ -615,7 +606,7 @@ const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, 
   };
 
   try {
-    const [orders, totalOrders] = await Promise.all([
+    const [ orders ] = await Promise.all([
       prismaClient.order.findMany({
         where: whereClause,
         select: {
@@ -649,9 +640,7 @@ const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, 
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
+        orderBy: { createdAt: 'desc' }
       }),
       prismaClient.order.count({ where: whereClause })
     ]);
@@ -672,17 +661,18 @@ const getAllOrdersAdmin = async ({ page = 1, limit = 10, status, paymentStatus, 
           name: order.user.fullName
         }
       })),
-      meta: {
-        currentPage: page,
-        totalPages: Math.ceil(totalOrders / limit),
-        totalItems: totalOrders
-      }
+      // meta: {
+      //   totalItems: totalOrders
+      // }
     };
   } catch (error) {
     console.error('Failed to fetch all orders:', error);
     throw error;
   }
 };
+
+
+
 
 const getOrderDetailAdmin = async (orderId) => {
   try {
@@ -808,6 +798,7 @@ const getOrderDetailAdmin = async (orderId) => {
     throw error;
   }
 };
+
 
 
 export default {
