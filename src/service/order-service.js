@@ -271,9 +271,9 @@ const updateOrderAdmin = async (orderId, { status, trackingNumber, shipping_name
       }
     });
 
-    if (['SHIPPED', 'COMPLETED'].includes(status)) {
-      await sendOrderNotification(updatedOrder);
-    }
+    // if (['SHIPPED', 'COMPLETED'].includes(status)) {
+    //   await sendOrderNotification(updatedOrder);
+    // }
 
     return updatedOrder;
   });
@@ -592,8 +592,8 @@ const completeOrder = async (userId, orderId) => {
       }
     });
 
-    // 4. Send notification (optional)
-    await sendOrderNotification(updatedOrder);
+    // // 4. Send notification (optional)
+    // await sendOrderNotification(updatedOrder);
 
     return updatedOrder;
   });
