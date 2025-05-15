@@ -47,7 +47,6 @@ const addProduct = async (adminId, request, imageFile) => {
 };
 
 
-
 const getAllProducts = async () => {
   const products = await prismaClient.product.findMany({
     select: {
@@ -61,7 +60,6 @@ const getAllProducts = async () => {
       stock: true,
       expiryDate: true,
       ratingAvg: true,
-      // reviewCount: true,
       createdAt: true,
       addedBy: {
         select: {
@@ -69,39 +67,86 @@ const getAllProducts = async () => {
           email: true
         }
       },
-      // // Include recent reviews for rating context
-      // Review: {
-      //   take: 1,
-      //   orderBy: {
-      //     createdAt: 'desc'
-      //   },
-      //   select: {
-      //     rating: true
-      //   }
-      // }
-    },
-    // orderBy: [
-    //   {
-    //     ratingAvg: 'desc'
-    //   },
-    //   {
-    //     createdAt: 'desc'
-    //   }
-    // ]
+      Review: {
+        select: {
+          rating: true
+        }
+      }
+    }
   });
 
   // Format the response with additional rating info
-  return products.map(product => ({
-    ...product,
-    // weightInGrams: product.weight * 1000,
-    // Ensure ratingAvg is never null
-    ratingAvg: product.ratingAvg,
-    // Ensure reviewCount is never null
-    // reviewCount: product.reviewCount || 0,
-    // // Add latest rating for quick reference
-    // latestRating: product.Review.length > 0 ? product.Review[0].rating : null
-  }));
+  return products.map(product => {
+    // Hitung ulang ratingAvg jika ada review
+    const hasReviews = product.Review.length > 0;
+    const accurateRatingAvg = hasReviews 
+      ? product.Review.reduce((sum, review) => sum + review.rating, 0) / product.Review.length
+      : 0;
+
+    return {
+      ...product,
+      ratingAvg: accurateRatingAvg,
+      // Remove Review array from response
+      Review: undefined
+    };
+  });
 };
+
+
+// const getAllProducts = async () => {
+//   const products = await prismaClient.product.findMany({
+//     select: {
+//       id: true,
+//       name: true,
+//       price: true,
+//       description: true,
+//       imageUrl: true,
+//       category: true,
+//       weight: true,
+//       stock: true,
+//       expiryDate: true,
+//       ratingAvg: true,
+//       // reviewCount: true,
+//       createdAt: true,
+//       addedBy: {
+//         select: {
+//           id: true,
+//           email: true
+//         }
+//       },
+//       // // Include recent reviews for rating context
+//       // Review: {
+//       //   take: 1,
+//       //   orderBy: {
+//       //     createdAt: 'desc'
+//       //   },
+//       //   select: {
+//       //     rating: true
+//       //   }
+//       // }
+//     },
+//     // orderBy: [
+//     //   {
+//     //     ratingAvg: 'desc'
+//     //   },
+//     //   {
+//     //     createdAt: 'desc'
+//     //   }
+//     // ]
+//   });
+
+//   // Format the response with additional rating info
+//   return products.map(product => ({
+//     ...product,
+//     // weightInGrams: product.weight * 1000,
+//     // Ensure ratingAvg is never null
+//     ratingAvg: product.ratingAvg,
+//     // Ensure reviewCount is never null
+//     // reviewCount: product.reviewCount || 0,
+//     // // Add latest rating for quick reference
+//     // latestRating: product.Review.length > 0 ? product.Review[0].rating : null
+//   }));
+// };
 
 const getProductById = async (id) => {
   const product = await prismaClient.product.findUnique({
