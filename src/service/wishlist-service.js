@@ -77,47 +77,47 @@ const removeFromWishlist = async (userId, productId) => {
   });
 };
 
-const getUserWishlist = async ( userId ) => {
+
+const getUserWishlist = async (userId) => {
   userId = validate(userUuidValidation, userId);
-  // const { page, limit } = validate(wishlistQueryValidation, query);
 
-  // const skip = (page - 1) * limit;
-
-  const [ wishlist ] = await Promise.all([
-    prismaClient.wishlist.findMany({
-      where: { userId },
-      // skip,
-      // take: limit,
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            imageUrl: true,
-            ratingAvg: true,
-            reviewCount: true,
-            category: true
+  const wishlistItems = await prismaClient.wishlist.findMany({
+    where: { userId },
+    include: {
+      product: {
+        include: {
+          Review: {
+            select: {
+              rating: true
+            }
           }
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
       }
-    }),
-    prismaClient.wishlist.count({
-      where: { userId }
-    })
-  ]);
+    },
+    orderBy: {
+      createdAt: 'desc'
+    }
+  });
+
+  const productsWithRating = wishlistItems.map(item => {
+    const reviews = item.product.Review;
+    const ratingAvg = reviews.length > 0 
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+      : 0;
+
+    return {
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      imageUrl: item.product.imageUrl,
+      category: item.product.category,
+      ratingAvg,
+      reviewCount: reviews.length
+    };
+  });
 
   return {
-    data: wishlist.map(item => item.product),
-    // meta: {
-    //   total,
-    //   page,
-    //   limit,
-    //   totalPages: Math.ceil(total / limit)
-    // }
+    data: productsWithRating
   };
 };
 

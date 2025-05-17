@@ -185,60 +185,60 @@ const logout = async (userId) => {
 
 
 
-const loginAdmin = async (request) => {
-  // Validasi request
-  const loginRequest = validate(loginValidation, request);
+// const loginAdmin = async (request) => {
+//   // Validasi request
+//   const loginRequest = validate(loginValidation, request);
 
-  // Cari user dengan role ADMIN
-  const user = await prismaClient.user.findUnique({
-    where: {
-      email: loginRequest.email,
-      role: 'ADMIN' // Hanya admin yang bisa login
-    },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      fullName: true,
-      phone: true,
-      role: true,
-      avatar: true
-    }
-  });
+//   // Cari user dengan role ADMIN
+//   const user = await prismaClient.user.findUnique({
+//     where: {
+//       email: loginRequest.email,
+//       role: 'ADMIN' // Hanya admin yang bisa login
+//     },
+//     select: {
+//       id: true,
+//       email: true,
+//       password: true,
+//       fullName: true,
+//       phone: true,
+//       role: true,
+//       avatar: true
+//     }
+//   });
 
-  if (!user) {
-    throw new ResponseError(401, "Admin not found");
-  }
+//   if (!user) {
+//     throw new ResponseError(401, "Admin not found");
+//   }
 
-  // Verifikasi password
-  const isPasswordValid = await bcrypt.compare(loginRequest.password, user.password);
-  if (!isPasswordValid) {
-    throw new ResponseError(401, "Email or password wrong");
-  }
+//   // Verifikasi password
+//   const isPasswordValid = await bcrypt.compare(loginRequest.password, user.password);
+//   if (!isPasswordValid) {
+//     throw new ResponseError(401, "Email or password wrong");
+//   }
 
-  // Generate JWT token
-  const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '1h' }
-  );
+//   // Generate JWT token
+//   const token = jwt.sign(
+//     { id: user.id, email: user.email, role: user.role },
+//     process.env.JWT_SECRET,
+//     { expiresIn: '1h' }
+//   );
 
-  // Update token di database
-  await prismaClient.user.update({
-    where: { id: user.id },
-    data: { token: token }
-  });
+//   // Update token di database
+//   await prismaClient.user.update({
+//     where: { id: user.id },
+//     data: { token: token }
+//   });
 
-  return {
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email,
-    phone: user.phone,
-    role: user.role,
-    avatar: user.avatar,
-    token: token
-  };
-};
+//   return {
+//     id: user.id,
+//     fullName: user.fullName,
+//     email: user.email,
+//     phone: user.phone,
+//     role: user.role,
+//     avatar: user.avatar,
+//     token: token
+//   };
+// };
 
 
 const forgotPassword = async (email) => {
