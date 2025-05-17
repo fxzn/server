@@ -608,7 +608,6 @@ const deleteUser = async (userId) => {
 export default {
   register,
   login,
-  loginAdmin,
   logout,
   forgotPassword,
   resetPassword,
