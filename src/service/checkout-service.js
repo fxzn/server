@@ -84,7 +84,7 @@ const createMidtransTransaction = async (order, user) => {
         }
       },
       callbacks: {
-        finish: `${process.env.FRONTEND_URL}/orders/${order.id}`,
+        finish: `${process.env.FRONTEND_URL}/orders`,
         error: `${process.env.FRONTEND_URL}/orders/${order.id}?status=failed`,
         pending: `${process.env.FRONTEND_URL}/orders/${order.id}?status=pending`
       },
