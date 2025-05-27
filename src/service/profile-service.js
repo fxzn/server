@@ -1,4 +1,3 @@
-import bcrypt from 'bcrypt';
 import { prismaClient } from "../application/database.js";
 import { ResponseError } from "../error/response-error.js";
 import { cloudinary } from "../middleware/cloudinary-middleware.js";
@@ -27,71 +26,17 @@ const getUserProfile = async (userId) => {
 };
 
 
-// const updateProfile = async (userId, request) => {
-//   validate(updateProfileValidation, request); 
-  
-//   return await prismaClient.user.update({
-//     where: { id: userId },
-//     data: {
-//       fullName: validate.fullName,
-//       phone: validate.phone
-//     },
-//     select: { id: true, fullName: true, phone: true, email: true }
-//   });
-// };
-
-
 const updateProfile = async (userId, request) => {
-  const validated = validate(updateProfileValidation, request); 
-  // Dapatkan data user saat ini untuk cek provider
-  const currentUser = await prismaClient.user.findUnique({
-    where: { id: userId },
-    select: { provider: true }
-  });
-
-  // Data yang akan diupdate
-  const updateData = {
-    fullName: validated.fullName
-  };
-
-   // Untuk akun Google, selalu izinkan update phone
-  if (currentUser.provider === 'GOOGLE' && validated.phone !== undefined) {
-    updateData.phone = validated.phone || null;
-  } 
-  // Untuk akun LOCAL, hanya update jika ada nilai
-  else if (validated.phone) {
-    updateData.phone = validated.phone;
-  }
-
+  const validated = validate(updateProfileValidation, request); // Validasi: fullName, phone
+  
   return await prismaClient.user.update({
     where: { id: userId },
-    data: updateData,
-    select: {
-      id: true,
-      fullName: true,
-      phone: true,
-      email: true,
-      avatar: true,
-      role: true,
-      provider: true // Tambahkan provider di response
-    }
+    data: {
+      fullName: validated.fullName,
+      phone: validated.phone
+    },
+    select: { id: true, fullName: true, phone: true, email: true }
   });
-  
-  // return await prismaClient.user.update({
-  //   where: { id: userId },
-  //   data: {
-  //     fullName: validated.fullName,
-  //     phone: validated.phone
-  //   },
-  //   select: {
-  //     id: true,
-  //     fullName: true,
-  //     phone: true,
-  //     email: true,
-  //     avatar: true,
-  //     role: true
-  //   }
-  // });
 };
 
 
