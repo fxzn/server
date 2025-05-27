@@ -16,7 +16,7 @@ export const checkout = async (req, res, next) => {
       success: true,
       data: {
         ...order,
-        paymentToken: undefined // Hide sensitive data
+        paymentToken: undefined
       }
     });
   } catch (error) {
