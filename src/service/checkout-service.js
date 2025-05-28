@@ -184,7 +184,7 @@ const processCheckout = async (userId, checkoutData) => {
         shipping_name: selectedService.shipping_name,
         service_name: selectedService.service_name,
         estimatedDelivery: selectedService.etd || '1-3 days',
-        paymentMethod: checkoutData.paymentMethod // e.g., 'bank_transfer', 'gopay', etc.
+        paymentMethod: checkoutData.paymentMethod 
       },
       include: { items: { include: { product: true } } }
     });
