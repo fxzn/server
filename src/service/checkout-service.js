@@ -4,42 +4,42 @@ import komerceService from './komerce-service.js';
 import midtransService from './midtrans-service.js';
 
 
-const calculateCartTotals = (items) => {
-  return items.reduce((acc, item) => {
-    const itemTotal = item.product.price * item.quantity;
-    const itemWeight = item.product.weight * item.quantity;
+// const calculateCartTotals = (items) => {
+//   return items.reduce((acc, item) => {
+//     const itemTotal = item.product.price * item.quantity;
+//     const itemWeight = item.product.weight * item.quantity;
     
-    return {
-      subTotal: acc.subTotal + itemTotal,
-      totalWeight: acc.totalWeight + itemWeight,
-      itemsWithPrice: [
-        ...acc.itemsWithPrice,
-        {
-          productId: item.product.id,
-          product: item.product,
-          quantity: item.quantity,
-          price: item.product.price,
-          weight: item.product.weight
-        }
-      ]
-    };
-  }, { subTotal: 0, totalWeight: 0, itemsWithPrice: [] });
-};
+//     return {
+//       subTotal: acc.subTotal + itemTotal,
+//       totalWeight: acc.totalWeight + itemWeight,
+//       itemsWithPrice: [
+//         ...acc.itemsWithPrice,
+//         {
+//           productId: item.product.id,
+//           product: item.product,
+//           quantity: item.quantity,
+//           price: item.product.price,
+//           weight: item.product.weight
+//         }
+//       ]
+//     };
+//   }, { subTotal: 0, totalWeight: 0, itemsWithPrice: [] });
+// };
 
-const validateStockAvailability = (items) => {
-  const outOfStockItems = items.filter(item => item.product.stock < item.quantity);
+// const validateStockAvailability = (items) => {
+//   const outOfStockItems = items.filter(item => item.product.stock < item.quantity);
   
-  if (outOfStockItems.length > 0) {
-    throw new ResponseError(400, 'Insufficient stock', {
-      outOfStockItems: outOfStockItems.map(item => ({
-        productId: item.product.id,
-        productName: item.product.name,
-        requested: item.quantity,
-        available: item.product.stock
-      }))
-    });
-  }
-};
+//   if (outOfStockItems.length > 0) {
+//     throw new ResponseError(400, 'Insufficient stock', {
+//       outOfStockItems: outOfStockItems.map(item => ({
+//         productId: item.product.id,
+//         productName: item.product.name,
+//         requested: item.quantity,
+//         available: item.product.stock
+//       }))
+//     });
+//   }
+// };
 
 const createMidtransTransaction = async (order, user) => {
   try {
@@ -119,7 +119,7 @@ const processCheckout = async (userId, checkoutData) => {
   return await prismaClient.$transaction(async (prisma) => {
     const cart = await prisma.cart.findUnique({
       where: { userId },
-      include: { items: { include: { product: true } } }
+      include: { items: true } // Hanya ambil item tanpa relasi produk
     });
 
     if (!cart?.items?.length) throw new ResponseError(400, 'Cart is empty');
@@ -129,9 +129,46 @@ const processCheckout = async (userId, checkoutData) => {
       select: { fullName: true, email: true, phone: true }
     });
 
-    const { subTotal, totalWeight, itemsWithPrice } = calculateCartTotals(cart.items);
-    validateStockAvailability(cart.items);
+    // Ambil ulang semua produk dari database
+    const productIds = cart.items.map(item => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } }
+    });
 
+    const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+
+    const itemsWithPrice = cart.items.map(item => {
+      const product = productMap[item.productId];
+      if (!product) {
+        throw new ResponseError(404, `Product ID ${item.productId} not found`);
+      }
+      return {
+        productId: product.id,
+        quantity: item.quantity,
+        price: product.price,
+        weight: product.weight,
+        product: product
+      };
+    });
+
+    // Validasi stok
+    const outOfStockItems = itemsWithPrice.filter(item => item.product.stock < item.quantity);
+    if (outOfStockItems.length > 0) {
+      throw new ResponseError(400, 'Insufficient stock', {
+        outOfStockItems: outOfStockItems.map(item => ({
+          productId: item.product.id,
+          productName: item.product.name,
+          requested: item.quantity,
+          available: item.product.stock
+        }))
+      });
+    }
+
+    // Hitung subtotal dan berat total
+    const subTotal = itemsWithPrice.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalWeight = itemsWithPrice.reduce((sum, item) => sum + item.weight * item.quantity, 0);
+
+    // Hitung ongkir
     const shippingOptions = await komerceService.calculateShippingCost({
       shipper_destination_id: process.env.WAREHOUSE_LOCATION_ID,
       receiver_destination_id: checkoutData.destinationId,
@@ -139,8 +176,8 @@ const processCheckout = async (userId, checkoutData) => {
       item_value: subTotal
     });
 
-    const selectedService = shippingOptions.find(service => 
-      service.shipping_name.toLowerCase() === checkoutData.courier.toLowerCase() && 
+    const selectedService = shippingOptions.find(service =>
+      service.shipping_name.toLowerCase() === checkoutData.courier.toLowerCase() &&
       service.service_name.toLowerCase() === checkoutData.shippingService.toLowerCase()
     );
 
@@ -148,9 +185,9 @@ const processCheckout = async (userId, checkoutData) => {
       throw new ResponseError(400, 'Selected shipping service not available');
     }
 
-    // Update product stocks
+    // Update stok produk
     await Promise.all(
-      cart.items.map(item => 
+      itemsWithPrice.map(item =>
         prisma.product.update({
           where: { id: item.productId },
           data: { stock: { decrement: item.quantity } }
@@ -158,6 +195,7 @@ const processCheckout = async (userId, checkoutData) => {
       )
     );
 
+    // Simpan order
     const order = await prisma.order.create({
       data: {
         userId,
@@ -166,7 +204,7 @@ const processCheckout = async (userId, checkoutData) => {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
-            productName: item.product.name,
+            productName: item.product.name, // optional snapshot
             weight: item.weight
           }))
         },
@@ -184,15 +222,18 @@ const processCheckout = async (userId, checkoutData) => {
         shipping_name: selectedService.shipping_name,
         service_name: selectedService.service_name,
         estimatedDelivery: selectedService.etd || '1-3 days',
-        paymentMethod: checkoutData.paymentMethod 
+        paymentMethod: checkoutData.paymentMethod
       },
       include: { items: { include: { product: true } } }
     });
 
+    // Kosongkan cart
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
+    // Buat transaksi Midtrans
     const paymentData = await createMidtransTransaction(order, user);
 
+    // Update order dengan data pembayaran
     return await prisma.order.update({
       where: { id: order.id },
       data: {
@@ -200,40 +241,133 @@ const processCheckout = async (userId, checkoutData) => {
         paymentUrl: paymentData.paymentUrl,
         midtransOrderId: paymentData.midtransOrderId
       },
-      include: { items: { include: { product: true } } }}
-    )
-  },  {
-    maxWait: 20000, // 20 detik maksimal menunggu
-    timeout: 15000  // 15 detik timeout
+      include: { items: { include: { product: true } } }
+    });
+  }, {
+    maxWait: 20000,
+    timeout: 15000
   });
 };
 
+// const processCheckout = async (userId, checkoutData) => {
+//   return await prismaClient.$transaction(async (prisma) => {
+//     const cart = await prisma.cart.findUnique({
+//       where: { userId },
+//       include: { items: { include: { product: true } } }
+//     });
 
-const checkPaymentStatus = async (orderId) => {
-  const order = await prismaClient.order.findUnique({
-      where: { id: orderId },
-      select: { midtransOrderId: true }
-  });
+//     if (!cart?.items?.length) throw new ResponseError(400, 'Cart is empty');
+
+//     const user = await prisma.user.findUnique({
+//       where: { id: userId },
+//       select: { fullName: true, email: true, phone: true }
+//     });
+
+//     const { subTotal, totalWeight, itemsWithPrice } = calculateCartTotals(cart.items);
+//     validateStockAvailability(cart.items);
+
+//     const shippingOptions = await komerceService.calculateShippingCost({
+//       shipper_destination_id: process.env.WAREHOUSE_LOCATION_ID,
+//       receiver_destination_id: checkoutData.destinationId,
+//       weight: totalWeight,
+//       item_value: subTotal
+//     });
+
+//     const selectedService = shippingOptions.find(service => 
+//       service.shipping_name.toLowerCase() === checkoutData.courier.toLowerCase() && 
+//       service.service_name.toLowerCase() === checkoutData.shippingService.toLowerCase()
+//     );
+
+//     if (!selectedService) {
+//       throw new ResponseError(400, 'Selected shipping service not available');
+//     }
+
+//     // Update product stocks
+//     await Promise.all(
+//       cart.items.map(item => 
+//         prisma.product.update({
+//           where: { id: item.productId },
+//           data: { stock: { decrement: item.quantity } }
+//         })
+//       )
+//     );
+
+//     const order = await prisma.order.create({
+//       data: {
+//         userId,
+//         items: {
+//           create: itemsWithPrice.map(item => ({
+//             productId: item.productId,
+//             quantity: item.quantity,
+//             price: item.price,
+//             productName: item.product.name,
+//             weight: item.weight
+//           }))
+//         },
+//         status: 'PENDING',
+//         paymentStatus: 'PENDING',
+//         totalAmount: subTotal + selectedService.price,
+//         customerName: user.fullName,
+//         customerEmail: user.email,
+//         customerPhone: user.phone,
+//         shippingAddress: checkoutData.shippingAddress,
+//         shippingCity: checkoutData.shippingCity,
+//         shippingProvince: checkoutData.shippingProvince,
+//         shippingPostCode: checkoutData.shippingPostCode,
+//         shippingCost: selectedService.price,
+//         shipping_name: selectedService.shipping_name,
+//         service_name: selectedService.service_name,
+//         estimatedDelivery: selectedService.etd || '1-3 days',
+//         paymentMethod: checkoutData.paymentMethod 
+//       },
+//       include: { items: { include: { product: true } } }
+//     });
+
+//     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+//     const paymentData = await createMidtransTransaction(order, user);
+
+//     return await prisma.order.update({
+//       where: { id: order.id },
+//       data: {
+//         paymentToken: paymentData.token,
+//         paymentUrl: paymentData.paymentUrl,
+//         midtransOrderId: paymentData.midtransOrderId
+//       },
+//       include: { items: { include: { product: true } } }}
+//     )
+//   },  {
+//     maxWait: 20000, // 20 detik maksimal menunggu
+//     timeout: 15000  // 15 detik timeout
+//   });
+// };
+
+
+// const checkPaymentStatus = async (orderId) => {
+//   const order = await prismaClient.order.findUnique({
+//       where: { id: orderId },
+//       select: { midtransOrderId: true }
+//   });
   
-  if (!order) throw new ResponseError(404, 'Order not found');
+//   if (!order) throw new ResponseError(404, 'Order not found');
   
-  const statusResponse = await midtransService.core.transaction.status(order.midtransOrderId);
+//   const statusResponse = await midtransService.core.transaction.status(order.midtransOrderId);
   
-  return {
-      status: mapMidtransStatus(statusResponse.transaction_status),
-      paymentMethod: statusResponse.payment_type,
-      paidAt: statusResponse.settlement_time || null,
-      vaNumber: statusResponse.va_numbers?.[0]?.va_number,
-      bank: statusResponse.va_numbers?.[0]?.bank
-  } ,  {
-    maxWait: 20000, // 20 detik maksimal menunggu
-    timeout: 15000  // 15 detik timeout
-  };
-};
+//   return {
+//       status: mapMidtransStatus(statusResponse.transaction_status),
+//       paymentMethod: statusResponse.payment_type,
+//       paidAt: statusResponse.settlement_time || null,
+//       vaNumber: statusResponse.va_numbers?.[0]?.va_number,
+//       bank: statusResponse.va_numbers?.[0]?.bank
+//   } ,  {
+//     maxWait: 20000, // 20 detik maksimal menunggu
+//     timeout: 15000  // 15 detik timeout
+//   };
+// };
 
 
 export default {
   processCheckout,
-  checkPaymentStatus
+  // checkPaymentStatus
 };
 

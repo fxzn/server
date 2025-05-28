@@ -7,11 +7,11 @@ const snap = new midtransClient.Snap({
   clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
 
-console.log('Using Midtrans config:', {
-  isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
-  serverKey: process.env.MIDTRANS_SERVER_KEY,
-  clientKey: process.env.MIDTRANS_CLIENT_KEY
-});
+// console.log('Using Midtrans config:', {
+//   isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+//   serverKey: process.env.MIDTRANS_SERVER_KEY,
+//   clientKey: process.env.MIDTRANS_CLIENT_KEY
+// });
 
 // Konfigurasi timeout dan error handling untuk Snap
 snap.httpClient.http_client.defaults.timeout = 5000;
