@@ -63,7 +63,6 @@ const login = async (request) => {
   const user = await prismaClient.user.findUnique({
       where: {
           email: loginRequest.email,
-          deletedAt: null
       },
       select: {
           id: true,
@@ -127,14 +126,14 @@ const logout = async (userId) => {
   const user = await prismaClient.user.findUnique({
     where: { 
       id: userId,
-      deleteAt: null
+      // deleteAt: null
     },
     select: { token: true }
   });
   
-  // if (!user?.token) {
-  //   throw new ResponseError(400, "User already logged out");
-  // }
+  if (!user?.token) {
+    throw new ResponseError(400, "User already logged out");
+  }
   
   const updatedUser = await prismaClient.user.update({
     where: { id: userId },
@@ -155,7 +154,6 @@ const forgotPassword = async (email) => {
     where: { 
       email,
       provider: 'LOCAL',
-      deletedAt: null
     } 
   });
   
@@ -190,7 +188,6 @@ const resetPassword = async (token, password, confirmPassword) => {
   const users = await prismaClient.user.findMany({
     where: {
       resetPasswordExpire: { gt: new Date() },
-      deletedAt:null
     }
   });
 
@@ -230,7 +227,6 @@ const googleAuth = async (googleToken) => {
     let user = await prismaClient.user.findUnique({
       where: { 
         email,
-        deletedAt: null
       },
       select: {
         id: true,
@@ -306,7 +302,6 @@ const getAllUsersForAdmin = async () => {
   return await prismaClient.user.findMany({
     where: {
       role: 'USER', // Hanya ambil data USER biasa
-      deletedAt: null
     },
     select: {
       id: true,
@@ -334,7 +329,6 @@ const deleteUser = async (userId) => {
   const user = await prismaClient.user.findUnique({
     where: { 
       id: userId,
-      deletedAt: null,
     },
     include: {
       products: {
@@ -478,13 +472,13 @@ const deleteUser = async (userId) => {
   // }
 
   // hapus user soft delete
-  await prismaClient.user.update({
-    where: { id: userId },
-    data: { deletedAt: new Date() }
-  });
-  // await prismaClient.user.delete({
-  //   where: { id: userId }
+  // await prismaClient.user.update({
+  //   where: { id: userId },
+  //   data: { deletedAt: new Date() }
   // });
+  await prismaClient.user.delete({
+    where: { id: userId }
+  });
 
   return {
     id: userId,

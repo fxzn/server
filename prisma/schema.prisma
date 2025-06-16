@@ -29,7 +29,6 @@ model User {
   isVerified              Boolean       @default(false)
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
-  deletedAt               DateTime?
 
   products                Product[]
   carts                   Cart[]
@@ -211,7 +210,7 @@ model Review {
   comment             String?
   purchasedPrice      Float?      // Add this line
   createdAt           DateTime    @default(now())
-  deletedAt           DateTime?
+
   
   @@unique([orderId, productId, userId])
 }

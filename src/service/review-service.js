@@ -115,54 +115,69 @@ const completeOrder = async (userId, orderId) => {
   });
 };
 
-const getProductReviews = async ( productId ) => {
-  
-  const [ reviews ] = await Promise.all([
-    prismaClient.review.findMany({
-      where: { 
-        productId,
-        deletedAt: null
-        
-      },
-      include: {
-        user: {
-          select: {
-            fullName: true,
-            avatar: true
-          }
+const getProductReviews = async (productId) => {
+  const reviews = await prismaClient.review.findMany({
+    where: { productId },
+    include: {
+      user: {
+        select: {
+          fullName: true,
+          avatar: true
         }
-      },
-      orderBy: { createdAt: 'desc' },
-      // skip,
-      // take: limit
-    }),
-    prismaClient.review.count({ 
-      where: { 
-        productId,
-        deletedAt: null
-      } 
-    })
-  ]);
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 
-  return {
-    data: reviews,
-    // meta: {
-    //   currentPage: page,
-    //   totalPages: Math.ceil(total / limit),
-    //   totalItems: total
-    // }
-  };
+  return { data: reviews };
 };
 
+// const getProductReviews = async ( productId ) => {
+  
+//   const [ reviews ] = await Promise.all([
+//     prismaClient.review.findMany({
+//       where: { 
+//         productId
+//       },
+//       include: {
+//         user: {
+//           select: {
+//             fullName: true,
+//             avatar: true
+//           }
+//         }
+//       },
+//       orderBy: { createdAt: 'desc' },
+//       // skip,
+//       // take: limit
+//     }),
+//     prismaClient.review.count({ 
+//       where: { 
+//         productId,
+//         deletedAt: null
+//       } 
+//     })
+//   ]);
+
+//   return {
+//     data: reviews,
+//     // meta: {
+//     //   currentPage: page,
+//     //   totalPages: Math.ceil(total / limit),
+//     //   totalItems: total
+//     // }
+//   };
+// };
+
 const deleteReviewsByUser = async (userId) => {
-  await prismaClient.review.updateMany({
+  await prismaClient.review.deleteMany({
     where: {
-      userId,
-      deletedAt: null
+      userId
+      // deletedAt: null
     },
-    data: {
-      deletedAt: new Date()
-    }
+    // data: {
+    //   deletedAt: new Date()
+    // }
   });
 };
 
