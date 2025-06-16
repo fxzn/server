@@ -420,6 +420,10 @@ const deleteUser = async (userId) => {
     }
   });
 
+  await prismaClient.wishlist.deleteMany({
+    where: { userId }
+  });
+
   // if (user.orders.length > 0) {
   //   // Delete payment logs first
   //   await prismaClient.paymentLog.deleteMany({
