@@ -26,9 +26,9 @@ const getRevenueStats = async (filter = {}) => {
 
 const getUserStats = async () => {
   return await prismaClient.user.count({
-    where: {
-      deletedAt: null
-    }
+    // where: {
+    //   deletedAt: null
+    // }
   });
 };
 
