@@ -4,23 +4,16 @@ import productService from './product-service.js';
 
 
 
+
 const createReview = async (userId, orderId, { productId, rating, comment }) => {
   try {
     return await prismaClient.$transaction(async (prisma) => {
-      // Validate order exists and is completed
+      // 1. Cek order valid & status completed
       const order = await prisma.order.findUnique({
-        where: { id: orderId, userId },
-        include: { 
-          items: {
-            where: { productId },
-            select: {
-              price: true
-            }
-          }
-        }
+        where: { id: orderId },
       });
 
-      if (!order) {
+      if (!order || order.userId !== userId) {
         throw new ResponseError(404, 'Order not found');
       }
 
@@ -28,11 +21,19 @@ const createReview = async (userId, orderId, { productId, rating, comment }) => 
         throw new ResponseError(400, 'Order must be completed before reviewing');
       }
 
-      if (order.items.length === 0) {
+      // 2. Cek apakah productId memang dibeli dalam order tersebut
+      const orderItem = await prisma.orderItem.findFirst({
+        where: {
+          orderId,
+          productId
+        }
+      });
+
+      if (!orderItem) {
         throw new ResponseError(400, 'Product not found in this order');
       }
 
-      // Check for existing review
+      // 3. Cek apakah sudah pernah review
       const existingReview = await prisma.review.findFirst({
         where: { orderId, productId, userId }
       });
@@ -41,7 +42,7 @@ const createReview = async (userId, orderId, { productId, rating, comment }) => 
         throw new ResponseError(400, 'You have already reviewed this product');
       }
 
-      // Create the review
+      // 4. Buat review
       const newReview = await prisma.review.create({
         data: {
           orderId,
@@ -49,7 +50,7 @@ const createReview = async (userId, orderId, { productId, rating, comment }) => 
           userId,
           rating,
           comment: comment || null,
-          purchasedPrice: order.items[0].price
+          purchasedPrice: orderItem.price
         },
         include: {
           product: {
@@ -61,7 +62,7 @@ const createReview = async (userId, orderId, { productId, rating, comment }) => 
         }
       });
 
-      // Update product rating stats
+      // 5. Update rating produk
       await productService.updateProductRating(productId);
 
       return {
@@ -74,6 +75,7 @@ const createReview = async (userId, orderId, { productId, rating, comment }) => 
     throw new ResponseError(500, 'Failed to create review', error.message);
   }
 };
+
 
 
 
