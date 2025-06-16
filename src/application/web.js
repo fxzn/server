@@ -4,11 +4,16 @@ import { errorMiddleware } from '../middleware/error-middleware.js';
 import publicRoute from '../route/public-route.js';
 import router from '../route/api.js';
 import adminRouter from '../route/admin-route.js';
-import webhookRouter from '../route/webhook-route.js';
+
+import paymentController from '../controller/payment-controller.js';
 
 
 export const web = express();
-web.use(webhookRouter);
+// web.use(webhookRouter);
+web.post('/api/payment-webhook', 
+    express.raw({ type: 'application/json' }), 
+    paymentController.handlePaymentNotification
+);
 
 web.use(express.json());
 web.use(cors())
