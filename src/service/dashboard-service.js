@@ -1,5 +1,3 @@
-
-
 import { prismaClient } from "../application/database.js";
 
 const getOrderStats = async (filter = {}) => {
@@ -27,7 +25,11 @@ const getRevenueStats = async (filter = {}) => {
 };
 
 const getUserStats = async () => {
-  return await prismaClient.user.count();
+  return await prismaClient.user.count({
+    where: {
+      deletedAt: null
+    }
+  });
 };
 
 

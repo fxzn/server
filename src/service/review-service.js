@@ -119,7 +119,11 @@ const getProductReviews = async ( productId ) => {
   
   const [ reviews ] = await Promise.all([
     prismaClient.review.findMany({
-      where: { productId },
+      where: { 
+        productId,
+        deletedAt: null
+        
+      },
       include: {
         user: {
           select: {
@@ -132,7 +136,12 @@ const getProductReviews = async ( productId ) => {
       // skip,
       // take: limit
     }),
-    prismaClient.review.count({ where: { productId } })
+    prismaClient.review.count({ 
+      where: { 
+        productId,
+        deletedAt: null
+      } 
+    })
   ]);
 
   return {
@@ -145,8 +154,22 @@ const getProductReviews = async ( productId ) => {
   };
 };
 
+const deleteReviewsByUser = async (userId) => {
+  await prismaClient.review.updateMany({
+    where: {
+      userId,
+      deletedAt: null
+    },
+    data: {
+      deletedAt: new Date()
+    }
+  });
+};
+
+
 export default {
   createReview,
   completeOrder,
-  getProductReviews
+  getProductReviews,
+  deleteReviewsByUser
 };

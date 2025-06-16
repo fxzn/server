@@ -29,6 +29,7 @@ model User {
   isVerified              Boolean       @default(false)
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
+  deletedAt               DateTime?
 
   products                Product[]
   carts                   Cart[]
@@ -129,12 +130,12 @@ model Order {
   estimatedDelivery     String?
   paymentToken          String?           // Token transaksi Midtrans
   paymentUrl            String?           // URL pembayaran Midtrans
-  midtransOrderId       String?     @unique @db.VarChar(50)  // Tambahkan @unique
+  midtransOrderId       String?           @db.VarChar(50)        // Order ID dari Midtrans
   paymentStatus         PaymentStatus     @default(PENDING) // Status pembayaran
   paidAt                DateTime?         // Waktu pembayaran berhasil
   createdAt             DateTime          @default(now())
   cancelledAt           DateTime?       // Tambahkan ini
-  midtransResponse      String? 
+  midtransResponse      Json? 
   paymentVaNumber       String? 
   paymentBank           String?
   reviews               Review[]
@@ -210,6 +211,7 @@ model Review {
   comment             String?
   purchasedPrice      Float?      // Add this line
   createdAt           DateTime    @default(now())
+  deletedAt           DateTime?
   
   @@unique([orderId, productId, userId])
 }
