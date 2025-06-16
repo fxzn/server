@@ -130,7 +130,7 @@ model Order {
   estimatedDelivery     String?
   paymentToken          String?           // Token transaksi Midtrans
   paymentUrl            String?           // URL pembayaran Midtrans
-  midtransOrderId       String?           @db.VarChar(50)        // Order ID dari Midtrans
+  midtransOrderId       String? @unique          @db.VarChar(50)        // Order ID dari Midtrans
   paymentStatus         PaymentStatus     @default(PENDING) // Status pembayaran
   paidAt                DateTime?         // Waktu pembayaran berhasil
   createdAt             DateTime          @default(now())

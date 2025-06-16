@@ -3,7 +3,7 @@ import midtransClient from 'midtrans-client';
 import crypto from 'crypto';
 
 const core = new midtransClient.CoreApi({
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'false',
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
