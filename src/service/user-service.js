@@ -399,19 +399,19 @@ const deleteUser = async (userId) => {
   // Hapus semua order-related data
   await prismaClient.paymentLog.deleteMany({
     where: { orderId: { 
-      in: user.orders.filter(o => o.paymentStatus === 'PENDING').map(o => o.id) 
+      in: user.orders.map(o => o.id) 
     }}
   });
 
   await prismaClient.orderItem.deleteMany({
     where: { orderId: { 
-      in: user.orders.filter(o => o.paymentStatus === 'PENDING').map(o => o.id) 
+      in: user.orders.map(o => o.id) 
     }}
   });
 
   await prismaClient.review.deleteMany({
     where: { orderId: { 
-      in: user.orders.filter(o => o.paymentStatus === 'PENDING').map(o => o.id) } }
+      in: user.orders.map(o => o.id) } }
   });
 
   await prismaClient.order.deleteMany({
