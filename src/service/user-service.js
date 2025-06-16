@@ -416,8 +416,7 @@ const deleteUser = async (userId) => {
 
   await prismaClient.order.deleteMany({
     where: { 
-      userId,
-      paymentStatus: 'PENDING'
+      userId
     }
   });
 
