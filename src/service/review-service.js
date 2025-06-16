@@ -4,6 +4,76 @@ import productService from './product-service.js';
 
 
 
+const createReview = async (userId, orderId, { productId, rating, comment }) => {
+  try {
+    return await prismaClient.$transaction(async (prisma) => {
+      // Validate order exists and is completed
+      const order = await prisma.order.findUnique({
+        where: { id: orderId, userId },
+        include: { 
+          items: {
+            where: { productId },
+            select: {
+              price: true
+            }
+          }
+        }
+      });
+
+      if (!order) {
+        throw new ResponseError(404, 'Order not found');
+      }
+
+      if (order.status !== 'COMPLETED') {
+        throw new ResponseError(400, 'Order must be completed before reviewing');
+      }
+
+      if (order.items.length === 0) {
+        throw new ResponseError(400, 'Product not found in this order');
+      }
+
+      // Check for existing review
+      const existingReview = await prisma.review.findFirst({
+        where: { orderId, productId, userId }
+      });
+
+      if (existingReview) {
+        throw new ResponseError(400, 'You have already reviewed this product');
+      }
+
+      // Create the review
+      const newReview = await prisma.review.create({
+        data: {
+          orderId,
+          productId,
+          userId,
+          rating,
+          comment: comment || null,
+          purchasedPrice: order.items[0].price
+        },
+        include: {
+          product: {
+            select: { name: true, imageUrl: true }
+          },
+          user: {
+            select: { fullName: true, avatar: true }
+          }
+        }
+      });
+
+      // Update product rating stats
+      await productService.updateProductRating(productId);
+
+      return {
+        ...newReview,
+        message: 'Thank you for your review!'
+      };
+    });
+  } catch (error) {
+    console.error('Review creation error:', error);
+    throw new ResponseError(500, 'Failed to create review', error.message);
+  }
+};
 
 const createReview = async (userId, orderId, { productId, rating, comment }) => {
   try {
