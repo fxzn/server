@@ -70,6 +70,16 @@ const createMidtransTransaction = async (order, user) => {
         order_id: midtransOrderId, // Use database order ID
         gross_amount: order.totalAmount
       },
+      // tambahkan metode yang kamu izinkan, selain "credit_card"
+      enabled_payments: [
+        'gopay',
+        'bca_va',
+        'permata_va',
+        'bank_transfer',
+        'indomaret',
+        'shopeepay'
+      ],
+      
       item_details: itemDetails,
       customer_details: {
         first_name: user.fullName?.split(' ')[0] || 'Customer',
@@ -82,6 +92,7 @@ const createMidtransTransaction = async (order, user) => {
           postal_code: order.shippingPostCode,
           country_code: 'IDN'
         }
+        
       },
       callbacks: {
         finish: `${process.env.FRONTEND_URL}/orders`,
