@@ -13,10 +13,23 @@ const uuidValidation = (value, helpers) => {
 // export const userUuidserValidation = Joi.string().custom(uuidValidation, 'UUID validation').required();
 const userUuidValidation = Joi.string().custom(uuidValidation, 'UUID validation').required();
 
+// const registerValidation = Joi.object({
+//     fullName: Joi.string().max(100).required(),
+//     email: Joi.string().email().max(100).required(),
+//     phone: Joi.string().max(20).required(),
+//     password: Joi.string().min(8).max(100).required(),
+//     confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+//         'any.only': 'Password confirmation does not match password'
+//     })
+// });
+
 const registerValidation = Joi.object({
     fullName: Joi.string().max(100).required(),
     email: Joi.string().email().max(100).required(),
-    phone: Joi.string().max(20).required(),
+    phone: Joi.string().pattern(/^[0-9]{10,13}$/).required().messages({
+    'string.pattern.base': 'Phone number must be between 10 to 13 digits and contain only numbers'
+    }),
+    // phone: Joi.string().max(20).required(),
     password: Joi.string().min(8).max(100).required(),
     confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
         'any.only': 'Password confirmation does not match password'

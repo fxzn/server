@@ -6,7 +6,7 @@ export const checkoutValidation = Joi.object({
   shippingCity: Joi.string().required(),
   shippingProvince: Joi.string().required(),
   shippingPostCode: Joi.string().required().pattern(/^\d+$/),
-  destinationId: Joi.string().required().pattern(/^\d+$/),
+  // destinationId: Joi.string().required().pattern(/^\d+$/),
   shippingService: Joi.string().required(),
   courier: Joi.string().required(),
   notes: Joi.string().max(500).optional()
