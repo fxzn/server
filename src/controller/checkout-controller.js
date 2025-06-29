@@ -77,7 +77,8 @@ export const getShippingOptions = async (req, res, next) => {
       receiver_destination_id,
       weight,
       item_value = 0,
-      cod = 'no'
+      cod = 'no',
+      courier 
     } = req.query;
 
     if (!shipper_destination_id || !receiver_destination_id || !weight) {
@@ -90,7 +91,8 @@ export const getShippingOptions = async (req, res, next) => {
       receiver_destination_id,
       weight: parseFloat(weight),
       item_value: parseInt(item_value) || 0,
-      cod: cod === 'yes'
+      cod: cod === 'yes',
+      courier 
     };
 
     // Debug log
