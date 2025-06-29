@@ -67,62 +67,76 @@ async searchDestinations(keyword) {
   // Fungsi untuk menghitung ongkos kirim berdasarkan parameter tertentu
 async calculateShippingCost(params) {
   try {
-    const requiredParams = ['shipper_destination_id', 'receiver_destination_id', 'weight'];
+    // Validate required parameters
+    const requiredParams = ['shipper_destination_id', 'receiver_destination_id', 'weight', 'courier'];
     const missingParams = requiredParams.filter(param => !params[param]);
-
+    
     if (missingParams.length > 0) {
       throw new ResponseError(400, `Missing required parameters: ${missingParams.join(', ')}`);
     }
 
-    const weightInKg = parseFloat(params.weight).toFixed(2);
-    const SUPPORTED_COURIERS = ['jne', 'jnt', 'sicepat', 'anteraja']; // ← sesuaikan dengan kurir yang tersedia
-
-    let allServices = [];
-
-    for (const courier of SUPPORTED_COURIERS) {
-      try {
-        console.log(`⏳ Requesting shipping cost for courier: ${courier}`);
-
-        const response = await this.axiosInstance.get('/tariff/api/v1/calculate', {
-          params: {
-            shipper_destination_id: params.shipper_destination_id,
-            receiver_destination_id: params.receiver_destination_id,
-            weight: weightInKg,
-            item_value: params.item_value || 0,
-            courier,
-            cod: params.cod ? 'yes' : 'no',
-            origin_pin_point: params.origin_pin_point || '',
-            destination_pin_point: params.destination_pin_point || ''
-          }
-        });
-
-        if (response.data && response.data.success && response.data.data?.calculate_reguler) {
-          const services = response.data.data.calculate_reguler.map(service => ({
-            courier,
-            shipping_name: service.shipping_name,
-            service_name: service.service_name,
-            price: service.shipping_cost,
-            etd: service.etd,
-            cod_available: service.is_cod,
-            shipping_cost: service.shipping_cost,
-            shipping_cost_net: service.shipping_cost_net,
-            grandtotal: service.grandtotal,
-            service_code: service.service_code || service.service_name
-          }));
-
-          allServices = allServices.concat(services);
-        }
-      } catch (courierError) {
-        console.warn(`⚠️ Gagal mengambil ongkir dari ${courier}:`, courierError.message);
-        // Continue to next courier
+    console.log('Sending shipping calculation request to Komerce API:', {
+      params: {
+        shipper_destination_id: params.shipper_destination_id,
+        receiver_destination_id: params.receiver_destination_id,
+        weight: params.weight,
+        item_value: params.item_value || 0,
+        courier: params.courier,
+        cod: params.cod || false,
+        origin_pin_point: params.origin_pin_point || '',
+        destination_pin_point: params.destination_pin_point || ''
       }
+    });
+
+    const weightInKg = parseFloat(params.weight).toFixed(2);
+
+    const response = await this.axiosInstance.get('/tariff/api/v1/calculate', {
+      params: {
+        shipper_destination_id: params.shipper_destination_id,
+        receiver_destination_id: params.receiver_destination_id,
+        weight: weightInKg,
+        item_value: params.item_value || 0,
+        courier: params.courier.toLowerCase(),
+        cod: params.cod ? 'yes' : 'no',
+        origin_pin_point: params.origin_pin_point || '',
+        destination_pin_point: params.destination_pin_point || ''
+      }
+    });
+
+    console.log('Raw Komerce API response:', JSON.stringify(response.data, null, 2));
+
+    if (!response.data || typeof response.data !== 'object') {
+      throw new ResponseError(502, 'Invalid API response structure');
     }
 
-    if (allServices.length === 0) {
-      throw new ResponseError(404, 'No shipping services available from any courier');
+    if (response.data.success === false) {
+      throw new ResponseError(
+        response.data.code || 400,
+        response.data.message || 'API request failed',
+        response.data
+      );
     }
 
-    return allServices;
+    // MODIFIED: Remove the .filter(service => service.available) since the API doesn't include this field
+    const availableServices = response.data.data.calculate_reguler
+      .map(service => ({
+        shipping_name: service.shipping_name,
+        service_name: service.service_name,
+        price: service.shipping_cost,
+        etd: service.etd,
+        cod_available: service.is_cod,
+        shipping_cost: service.shipping_cost,
+        shipping_cost_net: service.shipping_cost_net,
+        grandtotal: service.grandtotal,
+        service_code: service.service_code || service.service_name // Fallback to service_name if code not available
+      }));
+
+    // MODIFIED: Only throw error if array is completely empty
+    if (availableServices.length === 0) {
+      throw new ResponseError(404, 'No shipping services available for the selected parameters');
+    }
+
+    return availableServices;
 
   } catch (error) {
     console.error('Shipping calculation failed:', {
@@ -149,7 +163,6 @@ async calculateShippingCost(params) {
     );
   }
 }
-
 
 async getValidDestinationId({ districtName, cityName }) {
   const destinations = await this.searchDestinations(districtName);

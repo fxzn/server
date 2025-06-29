@@ -70,47 +70,53 @@ export const checkout = async (req, res, next) => {
 // controller/checkout-controller.js
 export const getShippingOptions = async (req, res, next) => {
   try {
-    // Validasi dan parse parameter
-    
     const { 
       shipper_destination_id,
       receiver_destination_id,
       weight,
       item_value = 0,
-      cod = 'no',
-      courier 
+      cod = 'no'
     } = req.query;
 
     if (!shipper_destination_id || !receiver_destination_id || !weight) {
       throw new ResponseError(400, 'Missing required parameters');
     }
 
-    // Parse nilai
-    const params = {
-      shipper_destination_id,
-      receiver_destination_id,
-      weight: parseFloat(weight),
-      item_value: parseInt(item_value) || 0,
-      cod: cod === 'yes',
-      courier 
-    };
+    const COURIERS = ['jne', 'jnt', 'sicepat', 'anteraja', 'wahana'];
+    const allCourierOptions = [];
 
-    // Debug log
-    console.log('Process shipping options with:', params);
+    for (const courier of COURIERS) {
+      try {
+        const options = await komerceService.calculateShippingCost({
+          shipper_destination_id,
+          receiver_destination_id,
+          weight: parseFloat(weight),
+          item_value: parseInt(item_value) || 0,
+          cod: cod === 'yes',
+          courier
+        });
 
-    const options = await komerceService.calculateShippingCost(params);
+        allCourierOptions.push(...options);
+      } catch (err) {
+        console.warn(`❌ Courier ${courier} failed:`, err.message);
+      }
+    }
+
+    if (allCourierOptions.length === 0) {
+      throw new ResponseError(404, 'Tidak ada opsi pengiriman tersedia dari kurir manapun');
+    }
 
     res.json({
       success: true,
-      data: options,
+      data: allCourierOptions,
       meta: {
+        couriers_checked: COURIERS,
         currency: 'IDR',
         timestamp: new Date().toISOString()
       }
     });
 
   } catch (error) {
-    // Format error response
     const statusCode = error.status || 500;
     const errorData = {
       code: error.code || 'SHIPPING_CALCULATION_ERROR',
@@ -118,14 +124,13 @@ export const getShippingOptions = async (req, res, next) => {
       ...(error.details && { details: error.details })
     };
 
-    console.error(`Shipping Options Error [${statusCode}]:`, errorData);
-
     res.status(statusCode).json({
       success: false,
       error: errorData
     });
   }
 };
+
 
 
 
