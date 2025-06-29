@@ -121,6 +121,7 @@ model Order {
   shippingAddress       String
   shippingCity          String
   shippingDistrict      String? 
+  shippingSubdistrict   String?
   shippingProvince      String
   shippingPostCode      String
   shippingCost          Float

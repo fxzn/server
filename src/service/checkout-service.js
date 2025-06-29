@@ -72,7 +72,10 @@ const createMidtransTransaction = async (order, user) => {
         duration: 24                              // Transaksi kedaluwarsa setelah 24 jam
       },
       metadata: {
-        internal_order_id: order.id               // Metadata tambahan (bisa untuk pelacakan internal)
+        internal_order_id: order.id,               // Metadata tambahan (bisa untuk pelacakan internal)
+        shipping_subdistrict: matchingSubdistrict.subdistrict_name,
+        shipping_district: matchingSubdistrict.district_name,
+        shipping_city: matchingSubdistrict.city_name
       }
     };
 
@@ -154,86 +157,62 @@ const processCheckout = async (userId, checkoutData) => {
     const totalWeight = itemsWithPrice.reduce((sum, item) => sum + item.weight * item.quantity, 0);
 
     // Fungsi untuk mencari kecamatan yang lebih toleran
-const findMatchingSubdistrict = async (districtName, cityName) => {
+const findMatchingSubdistrict = async (subdistrictName, districtName, cityName) => {
   try {
-    // Panggil API Komerce - dapatkan response asli
-    const response = await komerceService.searchDestinations(districtName);
-    
+    const response = await komerceService.searchDestinations(subdistrictName);
+
     console.log('Raw Komerce API Response:', JSON.stringify(response, null, 2));
 
-    // Validasi struktur respons
-    if (!response || !response.meta || response.meta.code !== 200) {
-      console.error('Invalid Komerce API response:', response);
+    if (!response || !response.meta || response.meta.code !== 200 || !Array.isArray(response.data)) {
       throw new ResponseError(500, 'Invalid response from shipping service');
     }
 
-    // Pastikan data ada dan berupa array
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      console.error('No subdistrict data found:', response);
-      throw new ResponseError(404, 'Kecamatan tidak ditemukan di sistem pengiriman');
-    }
-
-    // Normalisasi input pencarian
-    const normalizedCity = cityName.toLowerCase().trim();
+    const normalizedSubdistrict = subdistrictName.toLowerCase().trim();
     const normalizedDistrict = districtName.toLowerCase().trim();
+    const normalizedCity = cityName.toLowerCase().trim();
 
-    // Cari kecamatan yang cocok
     const match = response.data.find(item => {
       const itemSubdistrict = item.subdistrict_name?.toLowerCase() || '';
-      const itemCity = item.city_name?.toLowerCase() || '';
       const itemDistrict = item.district_name?.toLowerCase() || '';
-      
-      // Pencocokan exact match
-      const exactMatch = (
-        itemSubdistrict === normalizedDistrict &&
-        (itemCity === normalizedCity || itemDistrict === normalizedCity)
-      );
+      const itemCity = item.city_name?.toLowerCase() || '';
 
-      // Pencocokan partial match
-      const partialMatch = (
-        (itemSubdistrict.includes(normalizedDistrict) || 
-        normalizedDistrict.includes(itemSubdistrict)) &&
-        (itemCity.includes(normalizedCity) || 
-        itemDistrict.includes(normalizedCity))
+      return (
+        itemSubdistrict === normalizedSubdistrict &&
+        itemDistrict === normalizedDistrict &&
+        itemCity === normalizedCity
       );
-
-      return exactMatch || partialMatch;
     });
 
     if (!match) {
-      console.error('No matching subdistrict found. Search criteria:', {
-        district: normalizedDistrict,
-        city: normalizedCity,
-        availableOptions: response.data.map(d => ({
-          subdistrict: d.subdistrict_name,
-          city: d.city_name,
-          district: d.district_name,
-          id: d.id
-        }))
-      });
-      throw new ResponseError(404, `Kombinasi kecamatan '${districtName}' dan kota '${cityName}' tidak cocok`);
+      throw new ResponseError(404, `Kombinasi '${subdistrictName}', '${districtName}', '${cityName}' tidak cocok`);
     }
 
     console.log('Found matching subdistrict:', match);
     return match;
-
   } catch (error) {
     console.error('Error in findMatchingSubdistrict:', error);
     if (error instanceof ResponseError) throw error;
     throw new ResponseError(500, 'Gagal memproses data alamat pengiriman');
   }
 };
+
+
     // Cari kecamatan yang cocok
     const matchingSubdistrict = await findMatchingSubdistrict(
-      checkoutData.shippingDistrict,
-      checkoutData.shippingCity
+    checkoutData.shippingSubdistrict,
+  checkoutData.shippingDistrict,
+  checkoutData.shippingCity
     );
 
-    if (!matchingSubdistrict) {
-      throw new ResponseError(404, 
-        `Kombinasi kecamatan '${checkoutData.shippingDistrict}' dan kota '${checkoutData.shippingCity}' tidak ditemukan`
-      );
-    }
+    if (!checkoutData.shippingSubdistrict || !checkoutData.shippingDistrict || !checkoutData.shippingCity) {
+  throw new ResponseError(400, 'Subdistrict, district, dan city pengiriman harus diisi');
+}
+
+    // if (!matchingSubdistrict) {
+    //   throw new ResponseError(404, 
+    //     `Kombinasi kecamatan '${checkoutData.shippingDistrict}' dan kota '${checkoutData.shippingCity}' tidak ditemukan`
+    //   );
+    // }
 
     // Hitung ongkir menggunakan ID kecamatan
     const shippingOptions = await komerceService.calculateShippingCost({
@@ -288,7 +267,8 @@ const findMatchingSubdistrict = async (districtName, cityName) => {
         customerPhone: user.phone,
         shippingAddress: checkoutData.shippingAddress,
         shippingCity: checkoutData.shippingCity,
-        shippingDistrict: checkoutData.shippingDistrict, // tambahkan field district
+        shippingDistrict: checkoutData.shippingDistrict,
+        shippingSubdistrict: checkoutData.shippingSubdistrict, // tambahkan field district
         shippingProvince: checkoutData.shippingProvince,
         shippingPostCode: checkoutData.shippingPostCode,
         shippingCost: selectedService.price,
