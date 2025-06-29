@@ -72,10 +72,7 @@ const createMidtransTransaction = async (order, user) => {
         duration: 24                              // Transaksi kedaluwarsa setelah 24 jam
       },
       metadata: {
-        internal_order_id: order.id,               // Metadata tambahan (bisa untuk pelacakan internal)
-        shipping_subdistrict: matchingSubdistrict.subdistrict_name,
-        shipping_district: matchingSubdistrict.district_name,
-        shipping_city: matchingSubdistrict.city_name
+        internal_order_id: order.id               // Metadata tambahan (bisa untuk pelacakan internal)
       }
     };
 
@@ -198,23 +195,27 @@ const findMatchingSubdistrict = async (subdistrictName, districtName, cityName) 
 
 
     // Cari kecamatan yang cocok
-    const matchingSubdistrict = await findMatchingSubdistrict(
-    checkoutData.shippingSubdistrict,
+const matchingSubdistrict = await findMatchingSubdistrict(
+  checkoutData.shippingSubdistrict,
   checkoutData.shippingDistrict,
   checkoutData.shippingCity
-    );
+);
 
-    if (!checkoutData.shippingSubdistrict || !checkoutData.shippingDistrict || !checkoutData.shippingCity) {
+if (!checkoutData.shippingSubdistrict || !checkoutData.shippingDistrict || !checkoutData.shippingCity) {
   throw new ResponseError(400, 'Subdistrict, district, dan city pengiriman harus diisi');
 }
 
-    // if (!matchingSubdistrict) {
-    //   throw new ResponseError(404, 
-    //     `Kombinasi kecamatan '${checkoutData.shippingDistrict}' dan kota '${checkoutData.shippingCity}' tidak ditemukan`
-    //   );
-    // }
+
+    if (!matchingSubdistrict) {
+      throw new ResponseError(404, 
+        `Kombinasi kecamatan '${checkoutData.shippingDistrict}' dan kota '${checkoutData.shippingCity}' tidak ditemukan`
+      );
+    }
+
 
     // Hitung ongkir menggunakan ID kecamatan
+
+
     const shippingOptions = await komerceService.calculateShippingCost({
       shipper_destination_id: process.env.WAREHOUSE_LOCATION_ID,
       receiver_destination_id: matchingSubdistrict.id,
@@ -222,6 +223,7 @@ const findMatchingSubdistrict = async (subdistrictName, districtName, cityName) 
       item_value: subTotal,
       courier: checkoutData.courier
     });
+
 
     // Validasi layanan pengiriman yang dipilih
     const selectedService = shippingOptions.find(service =>
@@ -267,8 +269,8 @@ const findMatchingSubdistrict = async (subdistrictName, districtName, cityName) 
         customerPhone: user.phone,
         shippingAddress: checkoutData.shippingAddress,
         shippingCity: checkoutData.shippingCity,
-        shippingDistrict: checkoutData.shippingDistrict,
-        shippingSubdistrict: checkoutData.shippingSubdistrict, // tambahkan field district
+        shippingDistrict: checkoutData.shippingDistrict, // tambahkan field district
+        shippingSubdistrict: checkoutData.shippingSubdistrict,
         shippingProvince: checkoutData.shippingProvince,
         shippingPostCode: checkoutData.shippingPostCode,
         shippingCost: selectedService.price,

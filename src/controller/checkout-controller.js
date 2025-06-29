@@ -134,7 +134,6 @@ export const getShippingOptions = async (req, res, next) => {
 
 
 
-
 export const searchDestinations = async (req, res, next) => {
   try {
     const { keyword } = req.query;
